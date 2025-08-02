@@ -212,7 +212,7 @@ export const useJPX400StocksWithUtils = () => {
 
   // 開発環境用の銘柄コード配列を取得
   const getDevelopmentCodes = (): string[] => {
-    const topStocks = getTopStocks(currentConfig.maxStocks);
+    const topStocks = getTopStocks(10); //10銘柄のみ
     return topStocks.map(stock => stock.code);
   };
 

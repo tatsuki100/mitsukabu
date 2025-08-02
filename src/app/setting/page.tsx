@@ -73,7 +73,7 @@ const SettingPage = () => {
     action: () => void;
   } | null>(null);
 
-  // 開発環境用（5銘柄）の株価データ取得
+  // 開発環境用（10銘柄）の株価データ取得
   const handleDevelopmentFetch = async () => {
     if (jpxStocks.length === 0) return;
 
@@ -83,7 +83,7 @@ const SettingPage = () => {
       return { code, name: stock?.name || `銘柄${code}` };
     });
 
-    await executeStockFetch(stockList, '開発用5銘柄');
+    await executeStockFetch(stockList, 'テスト用10銘柄');
   };
 
   // 全銘柄（396銘柄）の株価データ取得
@@ -284,19 +284,19 @@ const SettingPage = () => {
           <button
             onClick={() => showConfirmModal(
               'fetch',
-              `開発用10銘柄の株価データを取得します。\n約6秒程度かかります。\n実行しますか？`,
+              `テスト用に10銘柄だけ株価データを取得します。\n約6秒程度かかります。\n実行しますか？`,
               handleDevelopmentFetch
             )}
             disabled={apiLoading || jpxStocks.length === 0}
             className="bg-blue-500 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
           >
-            {apiLoading ? '取得中...' : '開発用10銘柄取得'}
+            {apiLoading ? '取得中...' : 'テスト用10銘柄取得'}
           </button>
           
           <button
             onClick={() => showConfirmModal(
               'fetch',
-              `JPX400の全銘柄の株価データを取得します。\n約3-4分程度かかります。\n実行しますか？`,
+              `JPX400の全銘柄の株価データを取得します。\n約4〜5分程度かかります。\n実行しますか？`,
               handleFullFetch
             )}
             disabled={apiLoading || jpxStocks.length === 0}
