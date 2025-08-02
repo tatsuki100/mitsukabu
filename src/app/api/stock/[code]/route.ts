@@ -35,10 +35,10 @@ type YahooFinanceResponse = {
 // GET リクエストハンドラ
 export async function GET(
   request: NextRequest,
-  { params }: { params: { code: string } }
+  context: { params: Promise<{ code: string }> }
 ) {
   try {
-    const stockCode = params.code;
+    const { code: stockCode } = await context.params;
     
     // 銘柄コードの基本的なバリデーション
     if (!stockCode || !/^\d{4}$/.test(stockCode)) {
