@@ -7,7 +7,11 @@ import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import Header from '@/components/Header'
-import Footer from '@/components/Footer'
+
+// フッターを表示する場合はコメントアウト解除
+// import Footer from '@/components/Footer'
+
+// Googleアナリティクスを入れる場合はコメントアウト解除
 // import Script from 'next/script'
 
 const inter = Inter({
@@ -107,7 +111,7 @@ export default function RootLayout({
           <main className="pt-10 flex-1"> {/* ヘッダーの高さと同じ分の余白 */}
             {children}
           </main>
-          <Footer />
+          {/* <Footer /> */}
         </div>
       </body>
     </html>
