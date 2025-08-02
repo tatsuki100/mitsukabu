@@ -1,0 +1,68 @@
+.
+├── public
+│   ├── favicon.ico
+│   ├── jpx400.csv
+│   ├── og-image.jpg
+│   └── robots.txt
+├── src
+│   ├── app
+│   │   ├── api
+│   │   │   └── stock
+│   │   │       └── [code]
+│   │   │           └── route.ts
+│   │   ├── cross_v
+│   │   │   ├── [code]
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
+│   │   ├── favorites
+│   │   │   ├── [code]
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
+│   │   ├── holdings
+│   │   │   ├── [code]
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
+│   │   ├── privacy
+│   │   │   └── page.tsx
+│   │   ├── setting
+│   │   │   └── page.tsx
+│   │   ├── stock
+│   │   │   └── [code]
+│   │   │       └── page.tsx
+│   │   ├── terms
+│   │   │   └── page.tsx
+│   │   ├── turn_back
+│   │   │   ├── [code]
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
+│   │   ├── error.tsx
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── not-found.tsx
+│   │   └── page.tsx
+│   ├── components
+│   │   ├── Footer.tsx
+│   │   ├── Header.tsx
+│   │   ├── StockCard.tsx
+│   │   ├── StockChart.tsx
+│   │   ├── StockDetailPage.tsx
+│   │   └── StockList.tsx
+│   ├── hooks
+│   │   ├── useJPX400Stocks.ts
+│   │   ├── useStockDataStorage.ts
+│   │   ├── useStockMemo.ts
+│   │   ├── useStockScreening.ts
+│   │   └── useYahooFinanceAPI.ts
+│   ├── types
+│   │   └── stockData.ts
+│   └── middleware.ts
+├── .env.local
+├── .gitignore
+├── eslint.config.mjs
+├── next-env.d.ts
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── tailwind.config.ts
+└── tsconfig.json
