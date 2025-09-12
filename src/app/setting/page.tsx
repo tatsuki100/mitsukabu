@@ -226,9 +226,14 @@ const SettingPage = () => {
     <div className="container mx-auto px-4 py-8 space-y-6">
       {/* ヘッダー */}
       <div className="bg-blue-50 border border-blue-200 p-4 rounded">
-        <h1 className="text-2xl font-bold mb-2">株価データ設定</h1>
+        <h1 className="text-2xl font-bold mb-1">株価データ設定</h1>
         <p>Yahoo Finance APIから株価データを取得してlocalStorageに保存します。</p>
         <p>※毎年8月末に最新のJPX400銘柄リストを更新してください。（<a href="https://www.torezista.com/tool/jpx400/" target='_blank' className='text-blue-500 underline'>ダウンロードリンク</a>）</p>
+        <h2 className='mt-6 font-bold text-lg'>更新履歴</h2>
+        <ul>
+          <li>2025.09.12 - localstorageの5MB上限を改善</li>
+          <li>2025.08.03 -  デプロイ</li>
+        </ul>
       </div>
 
       {/* localStorage状況 */}

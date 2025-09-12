@@ -1,10 +1,11 @@
 // ========================================
 // src/hooks/useStockDataStorage.ts
-// Yahoo Finance APIから取得した株価データ、お気に入り機能、保有銘柄機能をlocalStorageに保存するカスタムHook
+// 5MB超過時自動圧縮対応版 - localStorage容量制限対策
 // ========================================
 
 import { useState, useEffect } from 'react';
 import { DailyData, StoredStock } from '@/types/stockData';
+import pako from 'pako';
 
 // Stock型（Yahoo API用に調整）
 export type { StoredStock } from '@/types/stockData';
@@ -16,6 +17,7 @@ type StoredStockData = {
   lastUpdate: string;
   version: string;
   totalStocks: number;
+  isCompressed?: boolean; // 圧縮フラグを追加
 };
 
 // お気に入り管理用の型
@@ -75,10 +77,13 @@ const STORAGE_KEYS = {
   HOLDINGS: 'jpx400_holdings_v1',
 } as const;
 
-// データバージョン
-const DATA_VERSION = '1.0.0';
+// データバージョン（圧縮対応版）
+const DATA_VERSION = '1.1.0';
 const FAVORITES_VERSION = '1.0.0';
 const HOLDINGS_VERSION = '1.0.0';
+
+// 圧縮閾値（5MB）
+const COMPRESSION_THRESHOLD = 5 * 1024 * 1024;
 
 export const useStockDataStorage = (): UseStockDataStorageReturn => {
   const [storedData, setStoredData] = useState<StoredStockData | null>(null);
@@ -87,14 +92,81 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // データ圧縮関数
+  const compressData = (jsonString: string): string => {
+    try {
+      console.log('🗜️ データ圧縮開始...');
+
+      // UTF-8文字列をUint8Arrayに変換
+      const encoder = new TextEncoder();
+      const data = encoder.encode(jsonString);
+
+      // pako.deflateで圧縮
+      const compressed = pako.deflate(data);
+
+      // Base64エンコード
+      let binaryString = '';
+      for (let i = 0; i < compressed.length; i++) {
+        binaryString += String.fromCharCode(compressed[i]);
+      }
+      const base64 = btoa(binaryString);
+
+      const originalSize = (jsonString.length / 1024 / 1024).toFixed(2);
+      const compressedSize = (base64.length / 1024 / 1024).toFixed(2);
+      const compressionRatio = ((1 - base64.length / jsonString.length) * 100).toFixed(1);
+
+      console.log(`✅ 圧縮完了: ${originalSize}MB → ${compressedSize}MB (${compressionRatio}% 削減)`);
+
+      return base64;
+    } catch (error) {
+      console.error('❌ データ圧縮エラー:', error);
+      throw new Error('データ圧縮に失敗しました');
+    }
+  };
+
+  // データ解凍関数
+  const decompressData = (base64String: string): string => {
+    try {
+      console.log('📤 データ解凍開始...');
+
+      // Base64デコード
+      const binaryString = atob(base64String);
+      const compressed = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        compressed[i] = binaryString.charCodeAt(i);
+      }
+
+      // pako.inflateで解凍
+      const decompressed = pako.inflate(compressed);
+
+      // Uint8ArrayをUTF-8文字列に変換
+      const decoder = new TextDecoder();
+      const result = decoder.decode(decompressed);
+
+      console.log('✅ 解凍完了');
+      return result;
+    } catch (error) {
+      console.error('❌ データ解凍エラー:', error);
+      throw new Error('データ解凍に失敗しました');
+    }
+  };
+
+  // 圧縮データかどうかを判定
+  const isCompressedData = (data: string): boolean => {
+    // Base64文字列の特徴で判定
+    const base64Pattern = /^[A-Za-z0-9+/]*={0,2}$/;
+    return base64Pattern.test(data) && data.length > 100;
+  };
+
   // 初回読み込み
   useEffect(() => {
     loadStoredData();
     loadFavorites();
     loadHoldings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // localStorageからデータを読み込み
+  // localStorageからデータを読み込み（圧縮対応版）
   const loadStoredData = () => {
     try {
       setLoading(true);
@@ -108,18 +180,36 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
         return;
       }
 
-      const parsedData: StoredStockData = JSON.parse(rawData);
+      let parsedData: StoredStockData;
 
-      // データバージョンチェック
-      if (parsedData.version !== DATA_VERSION) {
+      // 圧縮データかどうかを判定
+      if (isCompressedData(rawData)) {
+        console.log('🗜️ 圧縮データを検出、解凍中...');
+        const decompressedData = decompressData(rawData);
+        parsedData = JSON.parse(decompressedData);
+        parsedData.isCompressed = true; // 圧縮フラグを設定
+      } else {
+        console.log('📄 非圧縮データを検出');
+        parsedData = JSON.parse(rawData);
+        parsedData.isCompressed = false;
+      }
+
+      // データバージョンチェック（旧バージョンも互換性保持）
+      if (parsedData.version !== DATA_VERSION && parsedData.version !== '1.0.0') {
         console.warn(`⚠️ データバージョンが古いため削除: ${parsedData.version} → ${DATA_VERSION}`);
         localStorage.removeItem(STORAGE_KEYS.STOCK_DATA);
         setStoredData(null);
         return;
       }
 
+      // バージョンを最新に更新
+      if (parsedData.version !== DATA_VERSION) {
+        parsedData.version = DATA_VERSION;
+      }
+
       console.log(`✅ localStorage: ${parsedData.totalStocks}銘柄のデータを読み込み`);
       console.log(`📅 最終更新: ${parsedData.lastUpdate}`);
+      console.log(`🗜️ 圧縮状態: ${parsedData.isCompressed ? '圧縮済み' : '非圧縮'}`);
 
       setStoredData(parsedData);
 
@@ -248,7 +338,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     }
   };
 
-  // localStorageにデータを保存
+  // localStorageにデータを保存（5MB超過時自動圧縮対応版）
   const saveStockData = (stocks: StoredStock[], dailyDataMap: Record<string, DailyData[]>) => {
     try {
       console.log(`💾 localStorage: ${stocks.length}銘柄のデータを保存開始...`);
@@ -258,24 +348,57 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
         dailyDataMap,
         lastUpdate: new Date().toISOString(),
         version: DATA_VERSION,
-        totalStocks: stocks.length
+        totalStocks: stocks.length,
+        isCompressed: false // 初期は非圧縮
       };
 
       const jsonData = JSON.stringify(dataToSave);
+      const originalSizeInMB = (jsonData.length / 1024 / 1024).toFixed(2);
 
-      // サイズチェック（5MB制限）
-      const sizeInMB = (jsonData.length / 1024 / 1024).toFixed(2);
-      console.log(`📊 データサイズ: ${sizeInMB}MB`);
+      console.log(`📊 元データサイズ: ${originalSizeInMB}MB`);
 
-      if (jsonData.length > 5 * 1024 * 1024) {
-        throw new Error(`データサイズが大きすぎます: ${sizeInMB}MB（上限: 5MB）`);
+      let finalData: string;
+      let wasCompressed = false;
+
+      // 5MBを超える場合は圧縮
+      if (jsonData.length > COMPRESSION_THRESHOLD) {
+        console.log('⚠️ データサイズが5MBを超えているため、圧縮を実行します');
+
+        try {
+          finalData = compressData(jsonData);
+          wasCompressed = true;
+
+          // 圧縮後のデータサイズをチェック
+          if (finalData.length > COMPRESSION_THRESHOLD) {
+            throw new Error(`圧縮後もデータサイズが制限を超えています: ${(finalData.length / 1024 / 1024).toFixed(2)}MB（制限: 5MB）`);
+          }
+
+        } catch (compressionError) {
+          console.error('❌ 圧縮処理に失敗:', compressionError);
+          throw new Error(`圧縮処理に失敗しました: ${compressionError instanceof Error ? compressionError.message : '不明なエラー'}`);
+        }
+
+      } else {
+        console.log('📝 データサイズが5MB以下のため、非圧縮で保存します');
+        finalData = jsonData;
       }
 
-      localStorage.setItem(STORAGE_KEYS.STOCK_DATA, jsonData);
-      setStoredData(dataToSave);
+      const finalSizeInMB = (finalData.length / 1024 / 1024).toFixed(2);
+      console.log(`📊 最終データサイズ: ${finalSizeInMB}MB (${wasCompressed ? '圧縮済み' : '非圧縮'})`);
+
+      // localStorage最終チェック
+      if (finalData.length > COMPRESSION_THRESHOLD) {
+        throw new Error(`データサイズが制限を超えています: ${finalSizeInMB}MB（制限: 5MB）`);
+      }
+
+      localStorage.setItem(STORAGE_KEYS.STOCK_DATA, finalData);
+
+      // stateの更新（圧縮フラグも更新）
+      const updatedData = { ...dataToSave, isCompressed: wasCompressed };
+      setStoredData(updatedData);
       setError(null);
 
-      console.log(`✅ localStorage: 保存完了 (${sizeInMB}MB)`);
+      console.log(`✅ localStorage: 保存完了 (${finalSizeInMB}MB, ${wasCompressed ? '圧縮済み' : '非圧縮'})`);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '不明なエラー';
@@ -477,7 +600,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     return `${year}-${month}-${day} ${hours}:${minutes}`;
   })() : null;
 
-  // ストレージ使用量を計算
+  // ストレージ使用量を計算（圧縮対応版）
   const storageUsage = (() => {
     try {
       const stockData = localStorage.getItem(STORAGE_KEYS.STOCK_DATA);
@@ -490,7 +613,16 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
       const totalSize = stockDataSize + favoritesDataSize + holdingsDataSize;
 
       const sizeInMB = (totalSize / 1024 / 1024).toFixed(2);
-      return `${sizeInMB}MB`;
+
+      // 圧縮状態を表示
+      let compressionInfo = '';
+      if (stockData && isCompressedData(stockData)) {
+        compressionInfo = ' (圧縮済み)';
+      } else if (stockData) {
+        compressionInfo = ' (非圧縮)';
+      }
+
+      return `${sizeInMB}MB${compressionInfo}`;
     } catch {
       return '不明';
     }
