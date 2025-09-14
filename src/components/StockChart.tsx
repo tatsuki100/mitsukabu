@@ -68,7 +68,7 @@ const StockChart = ({
   };
 
   // RSIを計算する関数
-  const calculateRSI = (closeData: number[], period: number = 14): (number | null)[] => {
+  const calculateRSI = (closeData: number[], period: number = 9): (number | null)[] => {
     if (closeData.length < period + 1) {
       return new Array(closeData.length).fill(null);
     }
@@ -194,7 +194,7 @@ const StockChart = ({
   const allMA5 = calculateMA(allCloseArray, 5);
   const allMA25 = calculateMA(allCloseArray, 25);
   const allMA75 = calculateMA(allCloseArray, 75);
-  const allRSI = calculateRSI(allCloseArray, 14);
+  const allRSI = calculateRSI(allCloseArray, 9);
   const allMACD = calculateMACD(allCloseArray);
 
   // 表示期間分のデータを切り出し

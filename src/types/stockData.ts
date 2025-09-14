@@ -62,7 +62,7 @@ export const CHART_PERIODS = {
 
 
 // RSIの計算期間
-export const RSI_DEFAULT_PERIOD = 14;
+export const RSI_DEFAULT_PERIOD = 9;
 
 
 // 移動平均線の期間設定（変更する場合はsrc/components/StockChart.tsxにもハードコードされているのでそっちも変更すること。）

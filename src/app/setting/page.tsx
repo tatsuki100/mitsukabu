@@ -231,6 +231,7 @@ const SettingPage = () => {
         <p>※毎年8月末に最新のJPX400銘柄リストを更新してください。（<a href="https://www.torezista.com/tool/jpx400/" target='_blank' className='text-blue-500 underline'>ダウンロードリンク</a>）</p>
         <h2 className='mt-6 font-bold text-lg'>更新履歴</h2>
         <ul>
+          <li>2025.09.14 - RSIの計算期間を14日から9日に変更</li>
           <li>2025.09.12 - localstorageの5MB上限を改善</li>
           <li>2025.08.03 -  デプロイ</li>
         </ul>

@@ -44,7 +44,7 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
   }, [stock.code, getMemo]);
 
   // RSIを計算する関数（StockChart.tsxと同じロジック）
-  const calculateRSI = (closeData: number[], period: number = 14): (number | null)[] => {
+  const calculateRSI = (closeData: number[], period: number = 9): (number | null)[] => {
     if (closeData.length < period + 1) {
       return new Array(closeData.length).fill(null);
     }
@@ -94,7 +94,7 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
     }
 
     const closeData = stockDetailData.dailyData.map(item => item.close);
-    const rsiArray = calculateRSI(closeData, 14);
+    const rsiArray = calculateRSI(closeData, 9);
 
     // 最新の有効なRSI値を取得（後ろから探す）
     for (let i = rsiArray.length - 1; i >= 0; i--) {
@@ -159,7 +159,7 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
     },
     rsi: {
       value: null,
-      period: 14
+      period: 9
     }
   };
 
@@ -244,7 +244,7 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
         <div className="space-y-1 text-sm">
           {/* RSI */}
           <div className="flex justify-between">
-            <span>RSI (14日)</span>
+            <span>RSI (9日)</span>
             <span className={getRSIColor(latestRSI)}>
               {getRSIDisplayText(latestRSI)}
             </span>

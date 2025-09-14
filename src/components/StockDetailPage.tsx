@@ -250,7 +250,7 @@ const StockDetailPage = ({
     },
     rsi: {
       value: null,
-      period: 14
+      period: 9
     }
   };
 
