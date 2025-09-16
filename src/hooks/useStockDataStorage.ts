@@ -1,6 +1,6 @@
 // ========================================
 // src/hooks/useStockDataStorage.ts
-// 5MB超過時自動圧縮対応版 - localStorage容量制限対策
+// 4MB超過時自動圧縮対応版 - localStorage容量制限対策
 // ========================================
 
 import { useState, useEffect } from 'react';
@@ -82,8 +82,8 @@ const DATA_VERSION = '1.1.0';
 const FAVORITES_VERSION = '1.0.0';
 const HOLDINGS_VERSION = '1.0.0';
 
-// 圧縮閾値（5MB）
-const COMPRESSION_THRESHOLD = 5 * 1024 * 1024;
+// 自動圧縮するサイズ（4MBを超えると自動圧縮する）
+const COMPRESSION_THRESHOLD = 4 * 1024 * 1024;
 
 export const useStockDataStorage = (): UseStockDataStorageReturn => {
   const [storedData, setStoredData] = useState<StoredStockData | null>(null);
@@ -338,7 +338,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     }
   };
 
-  // localStorageにデータを保存（5MB超過時自動圧縮対応版）
+  // localStorageにデータを保存（4MB超過時自動圧縮対応版）
   const saveStockData = (stocks: StoredStock[], dailyDataMap: Record<string, DailyData[]>) => {
     try {
       console.log(`💾 localStorage: ${stocks.length}銘柄のデータを保存開始...`);
@@ -360,9 +360,9 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
       let finalData: string;
       let wasCompressed = false;
 
-      // 5MBを超える場合は圧縮
+      // 4MBを超える場合は圧縮
       if (jsonData.length > COMPRESSION_THRESHOLD) {
-        console.log('⚠️ データサイズが5MBを超えているため、圧縮を実行します');
+        console.log('⚠️ データサイズが4MBを超えているため、圧縮を実行します');
 
         try {
           finalData = compressData(jsonData);
@@ -370,7 +370,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
 
           // 圧縮後のデータサイズをチェック
           if (finalData.length > COMPRESSION_THRESHOLD) {
-            throw new Error(`圧縮後もデータサイズが制限を超えています: ${(finalData.length / 1024 / 1024).toFixed(2)}MB（制限: 5MB）`);
+            throw new Error(`圧縮後もデータサイズが制限を超えています: ${(finalData.length / 1024 / 1024).toFixed(2)}MB（制限: 4MB）`);
           }
 
         } catch (compressionError) {
@@ -379,7 +379,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
         }
 
       } else {
-        console.log('📝 データサイズが5MB以下のため、非圧縮で保存します');
+        console.log('📝 データサイズが4MB以下のため、非圧縮で保存します');
         finalData = jsonData;
       }
 
@@ -388,7 +388,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
 
       // localStorage最終チェック
       if (finalData.length > COMPRESSION_THRESHOLD) {
-        throw new Error(`データサイズが制限を超えています: ${finalSizeInMB}MB（制限: 5MB）`);
+        throw new Error(`データサイズが制限を超えています: ${finalSizeInMB}MB（制限: 4MB）`);
       }
 
       localStorage.setItem(STORAGE_KEYS.STOCK_DATA, finalData);
