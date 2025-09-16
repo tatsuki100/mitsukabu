@@ -11,7 +11,7 @@ const EMAILJS_CONFIG = {
   SERVICE_ID: 'service_xvlxas4',
   TEMPLATE_ID: 'template_em900rf',
   PUBLIC_KEY: 'PCBa1doXA7FdMQQN7',
-  TO_EMAIL: 'mitsukabu.backup@gmail.com'
+  TO_EMAIL: 'bionicle.0119@gmail.com'
 };
 
 // バックアップ状態の型定義
