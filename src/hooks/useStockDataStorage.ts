@@ -501,11 +501,19 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     }
   };
 
-  // お気に入り銘柄のデータを取得
+  // お気に入り銘柄のデータを取得（銘柄コード昇順）
   const getFavoriteStocks = (): StoredStock[] => {
     if (!storedData) return [];
 
-    return storedData.stocks.filter(stock => favorites.includes(stock.code));
+    // お気に入り銘柄のデータを取得
+    const favoriteStocks = storedData.stocks.filter(stock => favorites.includes(stock.code));
+
+    // 銘柄コード（数値）で昇順ソート
+    return favoriteStocks.sort((a, b) => {
+      const codeA = parseInt(a.code, 10);
+      const codeB = parseInt(b.code, 10);
+      return codeA - codeB;
+    });
   };
 
   // 保有銘柄追加
