@@ -1,6 +1,6 @@
 // ========================================
 // src/app/setting/page.tsx
-// 株価データ取得・管理の設定ページ
+// 株価データ取得・管理の設定ページ（バックアップ機能付き）
 // ========================================
 
 'use client';
@@ -9,6 +9,8 @@ import { useState } from 'react';
 import { useJPX400StocksWithUtils } from '@/hooks/useJPX400Stocks';
 import { useYahooFinanceAPI } from '@/hooks/useYahooFinanceAPI';
 import { useStockDataStorage, StoredStock } from '@/hooks/useStockDataStorage';
+import { useEmailBackup } from '@/hooks/useEmailBackup';
+import { useStockMemo } from '@/hooks/useStockMemo';
 import { DailyData } from '@/types/stockData';
 
 // 取得進捗の型
@@ -59,8 +61,16 @@ const SettingPage = () => {
     clearStoredData,
     isDataAvailable,
     dataAge,
-    storageUsage
+    storageUsage,
+    favorites,
+    favoritesCount
   } = useStockDataStorage();
+
+  // メモ管理
+  const { getAllMemos } = useStockMemo();
+
+  // メールバックアップ機能
+  const { status: emailStatus, error: emailError, sendFavoritesBackup, resetStatus } = useEmailBackup();
 
   // 取得進捗の状態
   const [fetchProgress, setFetchProgress] = useState<FetchProgress | null>(null);
@@ -68,7 +78,7 @@ const SettingPage = () => {
 
   // 確認モーダルの状態
   const [showConfirm, setShowConfirm] = useState<{
-    type: 'fetch' | 'clear';
+    type: 'fetch' | 'clear' | 'backup';
     message: string;
     action: () => void;
   } | null>(null);
@@ -177,14 +187,46 @@ const SettingPage = () => {
     }
   };
 
+  // 観察銘柄のバックアップを実行
+  const handleBackupFavorites = async () => {
+    // メモデータを取得
+    const allMemos = getAllMemos();
+    const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
+
+    if (favoritesCount === 0 && memoCount === 0) {
+      alert('バックアップする観察銘柄もメモもありません。');
+      return;
+    }
+
+    // 銘柄名のマッピングを作成
+    const stockNames: { [key: string]: string } = {};
+    if (storedData) {
+      storedData.stocks.forEach(stock => {
+        stockNames[stock.code] = stock.name;
+      });
+    }
+
+    const result = await sendFavoritesBackup(favorites, stockNames, allMemos);
+    
+    if (result.success) {
+      alert('✅ 観察銘柄とメモをメールで送信しました！');
+    } else {
+      alert(`❌ メール送信に失敗しました: ${result.error}`);
+    }
+  };
+
   // 確認モーダルを表示
-  const showConfirmModal = (type: 'fetch' | 'clear', message: string, action: () => void) => {
+  const showConfirmModal = (type: 'fetch' | 'clear' | 'backup', message: string, action: () => void) => {
     setShowConfirm({ type, message, action });
   };
 
   // モーダルを閉じる
   const closeConfirmModal = () => {
     setShowConfirm(null);
+    // メール送信ステータスもリセット
+    if (emailStatus !== 'idle') {
+      resetStatus();
+    }
   };
 
   // データクリア実行
@@ -231,6 +273,7 @@ const SettingPage = () => {
         <p>※毎年8月末に最新のJPX400銘柄リストを更新してください。（<a href="https://www.torezista.com/tool/jpx400/" target='_blank' className='text-blue-500 underline'>ダウンロードリンク</a>）</p>
         <h2 className='mt-6 font-bold text-lg'>更新履歴</h2>
         <ul>
+          <li>2025.09.16 - 観察銘柄とメモのバックアップ機能を追加</li>
           <li>2025.09.14 - RSIの計算期間を14日から9日に変更</li>
           <li>2025.09.12 - localstorageの5MB上限を改善</li>
           <li>2025.08.03 -  デプロイ</li>
@@ -272,18 +315,66 @@ const SettingPage = () => {
         )}
       </div>
 
-      {/* 環境情報 */}
-      {/* <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
-        <h2 className="text-lg font-bold mb-3">現在の開発環境設定</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div><strong>最大銘柄数:</strong> {config.maxStocks}銘柄</div>
-          <div><strong>自動取得:</strong> {config.autoFetch ? '有効' : '無効'}</div>
-          <div><strong>デバッグボタン:</strong> {config.showDebugButton ? '表示' : '非表示'}</div>
+      {/* 観察銘柄バックアップ */}
+      <div className="bg-green-50 border border-green-200 p-4 rounded">
+        <h2 className="text-lg font-bold mb-1">📧 観察銘柄・メモバックアップ</h2>
+        <p className="text-gray-600 mb-3">
+          現在の観察銘柄一覧とメモをメールで送信します。
+          {(() => {
+            const allMemos = getAllMemos();
+            const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
+            return `（観察${favoritesCount}銘柄・メモ${memoCount}件）`;
+          })()}
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => {
+              const allMemos = getAllMemos();
+              const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
+              showConfirmModal(
+                'backup',
+                `現在の観察銘柄（${favoritesCount}銘柄）と\nメモ（${memoCount}件）をメールで送信します。\nよろしいですか？`,
+                handleBackupFavorites
+              );
+            }}
+            disabled={(() => {
+              const allMemos = getAllMemos();
+              const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
+              return emailStatus === 'sending' || (favoritesCount === 0 && memoCount === 0);
+            })()}
+            className={`font-bold py-2 px-4 rounded ${
+              emailStatus === 'sending'
+                ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                : (() => {
+                    const allMemos = getAllMemos();
+                    const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
+                    return (favoritesCount === 0 && memoCount === 0)
+                      ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                      : 'bg-green-500 hover:bg-green-700 text-white';
+                  })()
+            }`}
+          >
+            {emailStatus === 'sending' ? 'メール送信中...' : 'バックアップ'}
+          </button>
         </div>
-      </div> */}
+        {(() => {
+          const allMemos = getAllMemos();
+          const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
+          return favoritesCount === 0 && memoCount === 0 && (
+            <p className="text-red-500 text-sm mt-2">
+              バックアップする観察銘柄もメモもありません
+            </p>
+          );
+        })()}
+        {emailError && (
+          <p className="text-red-500 text-sm mt-2">
+            エラー: {emailError}
+          </p>
+        )}
+      </div>
 
       {/* データ取得ボタン */}
-      <div className="bg-green-50 border border-green-200 p-4 rounded">
+      <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
         <h2 className="text-lg font-bold mb-1">株価データ取得</h2>
         <p className='text-red-400 mb-3'>※APIリクエスト制限が起こらないように、更新し過ぎに注意してください。</p>
         <div className="flex flex-wrap gap-3">
@@ -302,7 +393,7 @@ const SettingPage = () => {
           <button
             onClick={() => showConfirmModal(
               'fetch',
-              `JPX400の全銘柄の株価データを取得します。\n約4〜5分程度かかります。\n実行しますか？`,
+              `JPX400の全銘柄の株価データを取得します。\n約4～5分程度かかります。\n実行しますか？`,
               handleFullFetch
             )}
             disabled={apiLoading || jpxStocks.length === 0}
@@ -393,7 +484,8 @@ const SettingPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md mx-4">
             <h3 className="text-lg font-bold mb-4">
-              {showConfirm.type === 'fetch' ? '実行確認' : '削除確認'}
+              {showConfirm.type === 'fetch' ? '実行確認' : 
+               showConfirm.type === 'backup' ? 'バックアップ確認' : '削除確認'}
             </h3>
             <p className="text-gray-700 mb-6 whitespace-pre-line">
               {showConfirm.message}
@@ -412,11 +504,14 @@ const SettingPage = () => {
                 }}
                 className={`px-4 py-2 text-white rounded ${
                   showConfirm.type === 'fetch' 
-                    ? 'bg-blue-500 hover:bg-blue-700' 
+                    ? 'bg-blue-500 hover:bg-blue-700'
+                    : showConfirm.type === 'backup'
+                    ? 'bg-green-500 hover:bg-green-700'
                     : 'bg-red-500 hover:bg-red-700'
                 }`}
               >
-                {showConfirm.type === 'fetch' ? '実行' : '削除'}
+                {showConfirm.type === 'fetch' ? '実行' : 
+                 showConfirm.type === 'backup' ? '送信' : '削除'}
               </button>
             </div>
           </div>

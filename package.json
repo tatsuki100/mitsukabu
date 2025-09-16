@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
     "@types/pako": "^2.0.4",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.7.9",
