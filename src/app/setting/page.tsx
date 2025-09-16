@@ -393,7 +393,7 @@ const SettingPage = () => {
           <button
             onClick={() => showConfirmModal(
               'fetch',
-              `JPX400の全銘柄の株価データを取得します。\n約4～5分程度かかります。\n実行しますか？`,
+              `JPX400の全銘柄の株価データを取得します。\n約7分程度かかります。\n実行しますか？`,
               handleFullFetch
             )}
             disabled={apiLoading || jpxStocks.length === 0}
