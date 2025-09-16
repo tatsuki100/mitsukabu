@@ -48,6 +48,7 @@
 │   │   ├── StockDetailPage.tsx
 │   │   └── StockList.tsx
 │   ├── hooks
+│   │   ├── useEmailBackup.ts
 │   │   ├── useJPX400Stocks.ts
 │   │   ├── useStockDataStorage.ts
 │   │   ├── useStockMemo.ts
