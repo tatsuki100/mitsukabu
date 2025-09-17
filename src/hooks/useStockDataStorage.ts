@@ -59,7 +59,7 @@ type UseStockDataStorageReturn = {
 
   // データ操作
   saveStockData: (
-    stocks: StoredStock[], 
+    stocks: StoredStock[],
     dailyDataMap: Record<string, DailyData[]>,
     nullDataSummary?: {
       totalStocksWithNullData: number;
@@ -173,7 +173,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
 
   // 株価データの保存（nullデータ警告情報対応）
   const saveStockData = (
-    stocks: StoredStock[], 
+    stocks: StoredStock[],
     dailyDataMap: Record<string, DailyData[]>,
     nullDataSummary?: {
       totalStocksWithNullData: number;
@@ -191,7 +191,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     try {
       const now = new Date().toISOString();
       const nullWarning = generateNullWarningInfo(nullDataSummary);
-      
+
       const dataToSave: StoredStockData = {
         stocks,
         dailyDataMap,
@@ -205,7 +205,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
       const sizeInBytes = new Blob([jsonString]).size;
 
       console.log(`💾 保存するデータサイズ: ${(sizeInBytes / 1024 / 1024).toFixed(2)}MB`);
-      
+
       if (nullWarning) {
         console.log(`⚠️ nullデータ警告情報を保存: ${nullWarning.summary}`);
       }
@@ -221,9 +221,9 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
 
       setStoredData(dataToSave);
       setError(null);
-      
+
       console.log(`✅ 株価データ保存完了: ${stocks.length}銘柄`);
-      
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '保存エラー';
       console.error('💾 株価データ保存エラー:', errorMessage);
@@ -251,7 +251,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
       }
 
       let data: StoredStockData;
-      
+
       try {
         // まず通常のJSONとして試行
         data = JSON.parse(stored);
@@ -281,7 +281,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
 
       setStoredData(data);
       console.log(`📊 株価データ読み込み完了: ${data.totalStocks}銘柄`);
-      
+
       if (data.nullDataWarning?.hasNullData) {
         console.log(`⚠️ 前回のnullデータ警告: ${data.nullDataWarning.summary}`);
       }
@@ -315,12 +315,12 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
   // 特定銘柄のデータ取得
   const getStoredStock = (stockCode: string): { stock: StoredStock; dailyData: DailyData[] } | null => {
     if (!storedData) return null;
-    
+
     const stock = storedData.stocks.find(s => s.code === stockCode);
     const dailyData = storedData.dailyDataMap[stockCode];
-    
+
     if (!stock || !dailyData) return null;
-    
+
     return { stock, dailyData };
   };
 
@@ -400,16 +400,15 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
 
   // 計算プロパティ
   const isDataAvailable = storedData !== null && storedData.stocks.length > 0;
-  
+
   const dataAge = storedData ? (() => {
     const lastUpdate = new Date(storedData.lastUpdate);
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return '1時間以内';
-    if (diffInHours < 24) return `${diffInHours}時間前`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays}日前`;
+    const year = lastUpdate.getFullYear();
+    const month = String(lastUpdate.getMonth() + 1).padStart(2, '0');
+    const day = String(lastUpdate.getDate()).padStart(2, '0');
+    const hour = String(lastUpdate.getHours()).padStart(2, '0');
+    const minute = String(lastUpdate.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hour}:${minute}`;
   })() : null;
 
   const storageUsage = (() => {
@@ -424,8 +423,8 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
       }
     }
     return totalSize < 1024 ? `${totalSize}B` :
-           totalSize < 1024 * 1024 ? `${(totalSize / 1024).toFixed(1)}KB` :
-           `${(totalSize / 1024 / 1024).toFixed(1)}MB`;
+      totalSize < 1024 * 1024 ? `${(totalSize / 1024).toFixed(1)}KB` :
+        `${(totalSize / 1024 / 1024).toFixed(1)}MB`;
   })();
 
   // お気に入り関連の関数
