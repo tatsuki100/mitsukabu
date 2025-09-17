@@ -24,11 +24,11 @@ type YahooFinanceResponse = {
       timestamp: number[];
       indicators: {
         quote: [{
-          open: number[];
-          high: number[];
-          low: number[];
-          close: number[];
-          volume: number[];
+          open: (number | null)[];
+          high: (number | null)[];
+          low: (number | null)[];
+          close: (number | null)[];
+          volume: (number | null)[];
         }];
       };
     }> | null;
@@ -36,12 +36,17 @@ type YahooFinanceResponse = {
   };
 };
 
-// エラー情報の型
+// エラー情報の型（nullデータ警告情報を追加）
 type StockDataResult = {
   success: boolean;
   stock?: Stock;
   dailyData?: DailyData[];
   error?: string;
+  nullDataWarning?: {
+    hasNullData: boolean;
+    nullDates: string[]; // null データがあった日付の配列
+    totalNullDays: number;
+  };
 };
 
 // Hook の戻り値の型
@@ -57,44 +62,125 @@ const generateYahooFinanceURL = (stockCode: string): string => {
   return `/api/stock/${stockCode}`;
 };
 
-// Yahoo APIレスポンス → DailyData配列に変換
-const convertYahooToDailyData = (yahooResponse: YahooFinanceResponse): DailyData[] => {
+// nullデータを検出し、フィルタリングする関数
+const filterNullData = (
+  timestamps: number[],
+  open: (number | null)[],
+  high: (number | null)[],
+  low: (number | null)[],
+  close: (number | null)[],
+  volume: (number | null)[]
+) => {
+  const nullDates: string[] = [];
+  const validIndices: number[] = [];
+
+  // nullデータを検出
+  timestamps.forEach((timestamp, index) => {
+    const hasNull = (
+      open[index] === null ||
+      high[index] === null ||
+      low[index] === null ||
+      close[index] === null ||
+      volume[index] === null
+    );
+
+    if (hasNull) {
+      // null データがある日付を記録
+      const date = new Date(timestamp * 1000);
+      const formattedDate = `${date.getMonth() + 1}/${date.getDate()}`;
+      nullDates.push(formattedDate);
+      console.warn(`⚠️ nullデータ検出: ${formattedDate} - Open:${open[index]}, High:${high[index]}, Low:${low[index]}, Close:${close[index]}, Volume:${volume[index]}`);
+    } else {
+      validIndices.push(index);
+    }
+  });
+
+  // 有効なデータのみを抽出
+  const filteredTimestamps = validIndices.map(i => timestamps[i]);
+  const filteredOpen = validIndices.map(i => open[i] as number);
+  const filteredHigh = validIndices.map(i => high[i] as number);
+  const filteredLow = validIndices.map(i => low[i] as number);
+  const filteredClose = validIndices.map(i => close[i] as number);
+  const filteredVolume = validIndices.map(i => volume[i] as number);
+
+  return {
+    filteredData: {
+      timestamps: filteredTimestamps,
+      open: filteredOpen,
+      high: filteredHigh,
+      low: filteredLow,
+      close: filteredClose,
+      volume: filteredVolume
+    },
+    nullWarning: {
+      hasNullData: nullDates.length > 0,
+      nullDates,
+      totalNullDays: nullDates.length
+    }
+  };
+};
+
+// Yahoo APIレスポンス → DailyData配列に変換（nullフィルタリング対応）
+const convertYahooToDailyData = (yahooResponse: YahooFinanceResponse): { dailyData: DailyData[], nullWarning: StockDataResult['nullDataWarning'] } => {
   const result = yahooResponse.chart.result![0];
   const timestamps = result.timestamp;
   const quote = result.indicators.quote[0];
   
-  return timestamps.map((timestamp, index) => ({
+  // nullデータをフィルタリング
+  const { filteredData, nullWarning } = filterNullData(
+    timestamps,
+    quote.open,
+    quote.high,
+    quote.low,
+    quote.close,
+    quote.volume
+  );
+
+  // フィルタリングされたデータからDailyDataを作成
+  const dailyData = filteredData.timestamps.map((timestamp, index) => ({
     date: new Date(timestamp * 1000).toISOString().split('T')[0],
-    open: quote.open[index],
-    close: quote.close[index],
-    high: quote.high[index],
-    low: quote.low[index],
-    volume: quote.volume[index]
+    open: filteredData.open[index],
+    close: filteredData.close[index],
+    high: filteredData.high[index],
+    low: filteredData.low[index],
+    volume: filteredData.volume[index]
   }));
+
+  return { dailyData, nullWarning };
 };
 
-// Yahoo APIレスポンス
+// Yahoo APIレスポンス → Stock型に変換（nullフィルタリング対応）
 const convertYahooToStock = (yahooResponse: YahooFinanceResponse, stockName: string): Stock => {
   const result = yahooResponse.chart.result![0];
   const meta = result.meta;
   const quote = result.indicators.quote[0];
   
-  // 最新の価格データ（配列の最後）
-  const lastIndex = quote.close.length - 1;
-  const currentPrice = quote.close[lastIndex];
+  // nullデータをフィルタリング
+  const { filteredData } = filterNullData(
+    result.timestamp,
+    quote.open,
+    quote.high,
+    quote.low,
+    quote.close,
+    quote.volume
+  );
+
+  // 最新の価格データ（フィルタリング後の配列の最後）
+  const lastIndex = filteredData.close.length - 1;
+  const currentPrice = filteredData.close[lastIndex];
   
   // 配列の最後から2番目が前営業日の終値
-  const previousPrice = lastIndex > 0 ? quote.close[lastIndex - 1] : currentPrice;
+  const previousPrice = lastIndex > 0 ? filteredData.close[lastIndex - 1] : currentPrice;
   
   return {
     code: meta.symbol.replace('.T', ''), // "7203.T" → "7203"
     name: stockName, // JPX400 CSVから取得した日本語名
     closePrice: currentPrice,
-    openPrice: quote.open[lastIndex],
-    highPrice: quote.high[lastIndex],
-    lowPrice: quote.low[lastIndex],
-    previousClosePrice: previousPrice, // 🔥 修正: 前営業日の終値を使用
-    lastUpdated: new Date(result.timestamp[lastIndex] * 1000).toISOString().split('T')[0],
+    openPrice: filteredData.open[lastIndex],
+    highPrice: filteredData.high[lastIndex],
+    lowPrice: filteredData.low[lastIndex],
+    previousClosePrice: previousPrice, // 修正: 前営業日の終値を使用
+    lastUpdated: new Date(filteredData.timestamps[lastIndex] * 1000).toISOString().split('T')[0],
     movingAverageLine: {
       shortTerm: null, // フロントエンドで計算
       midTerm: null,   // フロントエンドで計算
@@ -139,16 +225,22 @@ const fetchSingleStockWithRetry = async (
         throw new Error('データが見つかりません');
       }
       
-      // データ変換
+      // データ変換（nullフィルタリング込み）
       const stock = convertYahooToStock(data, stockName);
-      const dailyData = convertYahooToDailyData(data);
+      const { dailyData, nullWarning } = convertYahooToDailyData(data);
       
-      console.log(`${stockCode} (${stockName}): 取得成功 - ${dailyData.length}日分のデータ`);
+      // nullデータがあった場合はコンソールに警告を出力
+      if (nullWarning?.hasNullData) {
+        console.warn(`⚠️ ${stockCode} (${stockName}): ${nullWarning.totalNullDays}日分のnullデータを除外しました - ${nullWarning.nullDates.join(', ')}`);
+      }
+      
+      console.log(`${stockCode} (${stockName}): 取得成功 - ${dailyData.length}日分のデータ（有効データのみ）`);
       
       return {
         success: true,
         stock,
-        dailyData
+        dailyData,
+        nullDataWarning: nullWarning
       };
       
     } catch (error) {

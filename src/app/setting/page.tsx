@@ -1,6 +1,6 @@
 // ========================================
 // src/app/setting/page.tsx
-// 株価データ取得・管理の設定ページ（バックアップ機能付き）
+// 株価データ取得・管理の設定ページ（nullデータ対応版）
 // ========================================
 
 'use client';
@@ -11,9 +11,10 @@ import { useYahooFinanceAPI } from '@/hooks/useYahooFinanceAPI';
 import { useStockDataStorage, StoredStock } from '@/hooks/useStockDataStorage';
 import { useEmailBackup } from '@/hooks/useEmailBackup';
 import { useStockMemo } from '@/hooks/useStockMemo';
+import { NullDataWarning } from '@/components/NullDataWarning';
 import { DailyData } from '@/types/stockData';
 
-// 取得進捗の型
+// 進捗管理の型
 type FetchProgress = {
   current: number;
   total: number;
@@ -23,7 +24,7 @@ type FetchProgress = {
   isCompleted: boolean;
 };
 
-// 取得結果の型定義（useYahooFinanceAPIのStockDataResultと同じ）
+// 取得結果の型定義（nullデータ警告情報付き）
 type StockDataResult = {
   success: boolean;
   stock?: {
@@ -38,6 +39,22 @@ type StockDataResult = {
   };
   dailyData?: DailyData[];
   error?: string;
+  nullDataWarning?: {
+    hasNullData: boolean;
+    nullDates: string[];
+    totalNullDays: number;
+  };
+};
+
+// nullデータサマリーの型
+type NullDataSummary = {
+  totalStocksWithNullData: number;
+  totalNullDays: number;
+  affectedStocks: Array<{
+    code: string;
+    name: string;
+    nullDates: string[];
+  }>;
 };
 
 const SettingPage = () => {
@@ -72,9 +89,13 @@ const SettingPage = () => {
   // メールバックアップ機能
   const { status: emailStatus, error: emailError, sendFavoritesBackup, resetStatus } = useEmailBackup();
 
-  // 取得進捗の状態
+  // 進捗管理の状態
   const [fetchProgress, setFetchProgress] = useState<FetchProgress | null>(null);
   const [fetchResults, setFetchResults] = useState<StockDataResult[]>([]);
+
+  // nullデータ警告の状態
+  const [nullDataSummary, setNullDataSummary] = useState<NullDataSummary | null>(null);
+  const [showNullWarning, setShowNullWarning] = useState<boolean>(true);
 
   // 確認モーダルの状態
   const [showConfirm, setShowConfirm] = useState<{
@@ -82,6 +103,38 @@ const SettingPage = () => {
     message: string;
     action: () => void;
   } | null>(null);
+
+  // nullデータサマリーを生成する関数
+  const generateNullDataSummary = (results: StockDataResult[]): NullDataSummary => {
+    const affectedStocks: Array<{
+      code: string;
+      name: string;
+      nullDates: string[];
+    }> = [];
+
+    let totalNullDays = 0;
+
+    results.forEach(result => {
+      if (result.success && result.nullDataWarning?.hasNullData && result.stock) {
+        const stock = result.stock;
+        const nullWarning = result.nullDataWarning;
+
+        affectedStocks.push({
+          code: stock.code,
+          name: stock.name,
+          nullDates: nullWarning.nullDates
+        });
+
+        totalNullDays += nullWarning.totalNullDays;
+      }
+    });
+
+    return {
+      totalStocksWithNullData: affectedStocks.length,
+      totalNullDays,
+      affectedStocks
+    };
+  };
 
   // 開発環境用（10銘柄）の株価データ取得
   const handleDevelopmentFetch = async () => {
@@ -108,12 +161,12 @@ const SettingPage = () => {
     await executeStockFetch(stockList, '全396銘柄');
   };
 
-  // 実際の株価データ取得処理
+  // 実際の株価データ取得処理（nullデータ対応）
   const executeStockFetch = async (stockList: { code: string; name: string }[], description: string) => {
     try {
       console.log(`🚀 ${description}の株価データ取得を開始`);
       
-      // 進捗初期化
+      // 進捗・警告初期化
       setFetchProgress({
         current: 0,
         total: stockList.length,
@@ -123,6 +176,8 @@ const SettingPage = () => {
         isCompleted: false
       });
       setFetchResults([]);
+      setNullDataSummary(null);
+      setShowNullWarning(true);
 
       // カスタム進捗付きフェッチ
       const results: StockDataResult[] = [];
@@ -158,7 +213,11 @@ const SettingPage = () => {
       setFetchProgress(prev => prev ? { ...prev, isCompleted: true } : null);
       setFetchResults(results);
 
-      // localStorage保存
+      // nullデータサマリーを生成
+      const summary = generateNullDataSummary(results);
+      setNullDataSummary(summary);
+
+      // localStorage保存（nullデータサマリー付き）
       const successResults = results.filter(r => r.success);
       if (successResults.length > 0) {
         const stocks: StoredStock[] = successResults.map(r => ({
@@ -174,16 +233,32 @@ const SettingPage = () => {
 
         const dailyDataMap: Record<string, DailyData[]> = {};
         successResults.forEach(r => {
-          dailyDataMap[r.stock!.code] = r.dailyData!;
+          if (r.stock && r.dailyData) {
+            dailyDataMap[r.stock.code] = r.dailyData;
+          }
         });
 
-        saveStockData(stocks, dailyDataMap);
+        // nullデータサマリーも一緒に保存
+        saveStockData(stocks, dailyDataMap, summary.totalStocksWithNullData > 0 ? {
+          totalStocksWithNullData: summary.totalStocksWithNullData,
+          totalNullDays: summary.totalNullDays,
+          affectedStocks: summary.affectedStocks
+        } : undefined);
+
         console.log(`${successResults.length}銘柄のデータをlocalStorageに保存完了`);
+        
+        if (summary.totalStocksWithNullData > 0) {
+          console.log(`⚠️ nullデータ検出: ${summary.totalStocksWithNullData}銘柄で合計${summary.totalNullDays}日分`);
+        }
       }
 
     } catch (error) {
       console.error('株価データ取得エラー:', error);
-      setFetchProgress(prev => prev ? { ...prev, isCompleted: true } : null);
+      setFetchProgress(prev => prev ? { 
+        ...prev, 
+        isCompleted: true,
+        currentStock: 'エラーが発生しました'
+      } : null);
     }
   };
 
@@ -234,6 +309,7 @@ const SettingPage = () => {
     clearStoredData();
     setFetchProgress(null);
     setFetchResults([]);
+    setNullDataSummary(null);
     closeConfirmModal();
   };
 
@@ -273,14 +349,23 @@ const SettingPage = () => {
         <p>※毎年8月末に最新のJPX400銘柄リストを更新してください。（<a href="https://www.torezista.com/tool/jpx400/" target='_blank' className='text-blue-500 underline'>ダウンロードリンク</a>）</p>
         <h2 className='mt-6 font-bold text-lg'>更新履歴</h2>
         <ul>
+          <li>2025.09.18 - 株価データがnullの場合のスキップ表示を実装</li>
           <li>2025.09.17 - localstorage上限時の自動圧縮を5MBから4MBに引き下げ</li>
           <li>2025.09.16 - 観察銘柄とメモのバックアップ機能を追加</li>
-          <li>2025.09.15 - JPX400銘柄更新</li>
+          <li>2025.09.15 - <span className='font-bold'>JPX400銘柄更新</span></li>
           <li>2025.09.14 - RSIの計算期間を14日から9日に変更</li>
           <li>2025.09.12 - localstorageの5MB上限を改善</li>
           <li>2025.08.03 - デプロイ</li>
         </ul>
       </div>
+
+      {/* nullデータ警告 */}
+      {showNullWarning && (
+        <NullDataWarning 
+          nullDataSummary={nullDataSummary}
+          onClose={() => setShowNullWarning(false)}
+        />
+      )}
 
       {/* localStorage状況 */}
       <div className="bg-white border border-gray-200 p-4 rounded shadow">
@@ -319,7 +404,7 @@ const SettingPage = () => {
 
       {/* 観察銘柄バックアップ */}
       <div className="bg-green-50 border border-green-200 p-4 rounded">
-        <h2 className="text-lg font-bold mb-1">📧 観察銘柄・メモバックアップ</h2>
+        <h2 className="text-lg font-bold mb-1">🔧 観察銘柄・メモバックアップ</h2>
         <p className="text-gray-600 mb-3">
           現在の観察銘柄一覧とメモをメールで送信します。
           {(() => {
@@ -378,12 +463,12 @@ const SettingPage = () => {
       {/* データ取得ボタン */}
       <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
         <h2 className="text-lg font-bold mb-1">株価データ取得</h2>
-        <p className='text-red-400 mb-3'>※APIリクエスト制限が起こらないように、更新し過ぎに注意してください。</p>
+        <p className='text-red-400 mb-3'>※APIリクエスト制限が起こらないように、更新しすぎに注意してください。</p>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => showConfirmModal(
               'fetch',
-              `テスト用に10銘柄だけ株価データを取得します。\n約6秒程度かかります。\n実行しますか？`,
+              `テスト用に10銘柄だけ株価データを取得します。\n約10程度かかります。\n実行しますか？`,
               handleDevelopmentFetch
             )}
             disabled={apiLoading || jpxStocks.length === 0}
