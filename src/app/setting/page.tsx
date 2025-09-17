@@ -59,9 +59,9 @@ type NullDataSummary = {
 
 const SettingPage = () => {
   // JPX400銘柄データ
-  const { 
-    stocks: jpxStocks, 
-    loading: jpxLoading, 
+  const {
+    stocks: jpxStocks,
+    loading: jpxLoading,
     error: jpxError,
     getDevelopmentCodes
   } = useJPX400StocksWithUtils();
@@ -165,7 +165,7 @@ const SettingPage = () => {
   const executeStockFetch = async (stockList: { code: string; name: string }[], description: string) => {
     try {
       console.log(`🚀 ${description}の株価データ取得を開始`);
-      
+
       // 進捗・警告初期化
       setFetchProgress({
         current: 0,
@@ -183,7 +183,7 @@ const SettingPage = () => {
       const results: StockDataResult[] = [];
       for (let i = 0; i < stockList.length; i++) {
         const { code, name } = stockList[i];
-        
+
         // 進捗更新
         setFetchProgress(prev => prev ? {
           ...prev,
@@ -246,7 +246,7 @@ const SettingPage = () => {
         } : undefined);
 
         console.log(`${successResults.length}銘柄のデータをlocalStorageに保存完了`);
-        
+
         if (summary.totalStocksWithNullData > 0) {
           console.log(`⚠️ nullデータ検出: ${summary.totalStocksWithNullData}銘柄で合計${summary.totalNullDays}日分`);
         }
@@ -254,8 +254,8 @@ const SettingPage = () => {
 
     } catch (error) {
       console.error('株価データ取得エラー:', error);
-      setFetchProgress(prev => prev ? { 
-        ...prev, 
+      setFetchProgress(prev => prev ? {
+        ...prev,
         isCompleted: true,
         currentStock: 'エラーが発生しました'
       } : null);
@@ -282,7 +282,7 @@ const SettingPage = () => {
     }
 
     const result = await sendFavoritesBackup(favorites, stockNames, allMemos);
-    
+
     if (result.success) {
       alert('✅ 観察銘柄とメモをメールで送信しました！');
     } else {
@@ -350,7 +350,7 @@ const SettingPage = () => {
         <h2 className='mt-6 font-bold text-lg'>更新履歴</h2>
         <ul>
           <li>2025.09.18 - 株価データがnullの場合のスキップ表示を実装</li>
-          <li>2025.09.17 - localstorage上限時の自動圧縮を5MBから4MBに引き下げ</li>
+          <li>2025.09.17 - localstorage上限時の自動圧縮を5MBから4.7MBに引き下げ</li>
           <li>2025.09.16 - 観察銘柄とメモのバックアップ機能を追加</li>
           <li>2025.09.15 - <span className='font-bold'>JPX400銘柄更新</span></li>
           <li>2025.09.14 - RSIの計算期間を14日から9日に変更</li>
@@ -361,7 +361,7 @@ const SettingPage = () => {
 
       {/* nullデータ警告 */}
       {showNullWarning && (
-        <NullDataWarning 
+        <NullDataWarning
           nullDataSummary={nullDataSummary}
           onClose={() => setShowNullWarning(false)}
         />
@@ -394,7 +394,7 @@ const SettingPage = () => {
             <div className="text-sm text-gray-700">データ状態</div>
           </div>
         </div>
-        
+
         {storageError && (
           <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded text-red-700">
             <strong>エラー:</strong> {storageError}
@@ -429,17 +429,16 @@ const SettingPage = () => {
               const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
               return emailStatus === 'sending' || (favoritesCount === 0 && memoCount === 0);
             })()}
-            className={`font-bold py-2 px-4 rounded ${
-              emailStatus === 'sending'
+            className={`font-bold py-2 px-4 rounded ${emailStatus === 'sending'
                 ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
                 : (() => {
-                    const allMemos = getAllMemos();
-                    const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
-                    return (favoritesCount === 0 && memoCount === 0)
-                      ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
-                      : 'bg-green-500 hover:bg-green-700 text-white';
-                  })()
-            }`}
+                  const allMemos = getAllMemos();
+                  const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
+                  return (favoritesCount === 0 && memoCount === 0)
+                    ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                    : 'bg-green-500 hover:bg-green-700 text-white';
+                })()
+              }`}
           >
             {emailStatus === 'sending' ? 'メール送信中...' : 'バックアップ'}
           </button>
@@ -476,7 +475,7 @@ const SettingPage = () => {
           >
             {apiLoading ? '取得中...' : 'テスト用10銘柄取得'}
           </button>
-          
+
           <button
             onClick={() => showConfirmModal(
               'fetch',
@@ -488,7 +487,7 @@ const SettingPage = () => {
           >
             {apiLoading ? '取得中...' : 'JPX400全銘柄取得'}
           </button>
-          
+
           <button
             onClick={() => showConfirmModal(
               'clear',
@@ -509,7 +508,7 @@ const SettingPage = () => {
           <h2 className="text-lg font-bold mb-3">📊 取得進捗</h2>
           <div className="space-y-3">
             <div className="bg-blue-200 rounded-full h-4">
-              <div 
+              <div
                 className="bg-blue-600 h-4 rounded-full transition-all duration-300"
                 style={{ width: `${(fetchProgress.current / fetchProgress.total) * 100}%` }}
               ></div>
@@ -566,13 +565,24 @@ const SettingPage = () => {
         </div>
       )}
 
+      {/* Gitコマンド */}
+      <div className="bg-blue-50 border border-blue-200 p-4 rounded">
+        <h2 className='mb-3 font-bold text-lg'>Gitのプッシュコマンド</h2>
+        <ul>
+          <li className='mb-3'># 変更されたファイルを確認：　git status</li>
+          <li className='mb-3'># 変更をステージング：　git add .</li>
+          <li className='mb-3'># コミット：　git commit -m &quot;update&quot;</li>
+          <li className='mb-3'># GitHubにプッシュ：　git push origin main</li>
+        </ul>
+      </div>
+
       {/* 確認モーダル */}
       {showConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 !mt-0">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md mx-4">
             <h3 className="text-lg font-bold mb-4">
-              {showConfirm.type === 'fetch' ? '実行確認' : 
-               showConfirm.type === 'backup' ? 'バックアップ確認' : '削除確認'}
+              {showConfirm.type === 'fetch' ? '実行確認' :
+                showConfirm.type === 'backup' ? 'バックアップ確認' : '削除確認'}
             </h3>
             <p className="text-gray-700 mb-6 whitespace-pre-line">
               {showConfirm.message}
@@ -589,16 +599,15 @@ const SettingPage = () => {
                   showConfirm.action();
                   closeConfirmModal();
                 }}
-                className={`px-4 py-2 text-white rounded ${
-                  showConfirm.type === 'fetch' 
+                className={`px-4 py-2 text-white rounded ${showConfirm.type === 'fetch'
                     ? 'bg-blue-500 hover:bg-blue-700'
                     : showConfirm.type === 'backup'
-                    ? 'bg-green-500 hover:bg-green-700'
-                    : 'bg-red-500 hover:bg-red-700'
-                }`}
+                      ? 'bg-green-500 hover:bg-green-700'
+                      : 'bg-red-500 hover:bg-red-700'
+                  }`}
               >
-                {showConfirm.type === 'fetch' ? '実行' : 
-                 showConfirm.type === 'backup' ? '送信' : '削除'}
+                {showConfirm.type === 'fetch' ? '実行' :
+                  showConfirm.type === 'backup' ? '送信' : '削除'}
               </button>
             </div>
           </div>

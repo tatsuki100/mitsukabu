@@ -1,32 +1,24 @@
 // ========================================
 // src/hooks/useStockDataStorage.ts
-// SSR対応版 - localStorage容量制限対策
+// 4.7MB超過時自動圧縮対応版 + SSR対応 + null関連実装対応版 - localStorage容量制限対策
+// バージョン3
 // ========================================
 
 import { useState, useEffect } from 'react';
-import { DailyData } from '@/types/stockData';
+import { DailyData, StoredStock } from '@/types/stockData';
 import pako from 'pako';
 
-// 個別銘柄データの型
-export type StoredStock = {
-  code: string;
-  name: string;
-  closePrice: number;
-  openPrice: number;
-  highPrice: number;
-  lowPrice: number;
-  previousClosePrice: number;
-  lastUpdated: string;
-};
+// Stock型（Yahoo API用に調整）
+export type { StoredStock } from '@/types/stockData';
 
-// localStorage保存用のデータ型（StoredStockDataに改名）
-export type StoredStockData = {
+// localStorage保存用のデータ型
+type StoredStockData = {
   stocks: StoredStock[];
-  dailyDataMap: Record<string, DailyData[]>;
+  dailyDataMap: Record<string, DailyData[]>; // 銘柄コード → DailyData配列
   lastUpdate: string;
   version: string;
   totalStocks: number;
-  isCompressed?: boolean;
+  isCompressed?: boolean; // 圧縮フラグを追加
   nullDataWarning?: {
     hasNullData: boolean;
     totalStocksWithNullData: number;
@@ -59,7 +51,7 @@ type UseStockDataStorageReturn = {
 
   // データ操作
   saveStockData: (
-    stocks: StoredStock[],
+    stocks: StoredStock[], 
     dailyDataMap: Record<string, DailyData[]>,
     nullDataSummary?: {
       totalStocksWithNullData: number;
@@ -105,13 +97,13 @@ const STORAGE_KEYS = {
   HOLDINGS: 'jpx400_holdings_v1',
 } as const;
 
-// データバージョン（nullデータ警告対応版）
+// データバージョン（null関連実装対応版）
 const DATA_VERSION = '1.2.0';
 const FAVORITES_VERSION = '1.0.0';
 const HOLDINGS_VERSION = '1.0.0';
 
-// 圧縮閾値（5MB）
-const COMPRESSION_THRESHOLD = 5 * 1024 * 1024;
+// 自動圧縮するサイズ（4.7MBを超えると自動圧縮する）
+const COMPRESSION_THRESHOLD = 4.7 * 1024 * 1024;
 
 export const useStockDataStorage = (): UseStockDataStorageReturn => {
   const [storedData, setStoredData] = useState<StoredStockData | null>(null);
@@ -145,35 +137,286 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     };
   };
 
-  // データの圧縮
-  const compressData = (data: StoredStockData): string => {
+  // データ圧縮関数
+  const compressData = (jsonString: string): string => {
     try {
-      const jsonString = JSON.stringify(data);
-      const compressed = pako.gzip(jsonString);
-      const base64 = btoa(String.fromCharCode.apply(null, Array.from(compressed)));
-      console.log(`💾 データを圧縮: ${jsonString.length} → ${base64.length} bytes`);
+      console.log('🗜️ データ圧縮開始...');
+
+      // UTF-8文字列をUint8Arrayに変換
+      const encoder = new TextEncoder();
+      const data = encoder.encode(jsonString);
+
+      // pako.deflateで圧縮
+      const compressed = pako.deflate(data);
+
+      // Base64エンコード
+      let binaryString = '';
+      for (let i = 0; i < compressed.length; i++) {
+        binaryString += String.fromCharCode(compressed[i]);
+      }
+      const base64 = btoa(binaryString);
+
+      const originalSize = (jsonString.length / 1024 / 1024).toFixed(2);
+      const compressedSize = (base64.length / 1024 / 1024).toFixed(2);
+      const compressionRatio = ((1 - base64.length / jsonString.length) * 100).toFixed(1);
+
+      console.log(`✅ 圧縮完了: ${originalSize}MB → ${compressedSize}MB (${compressionRatio}% 削減)`);
+
       return base64;
     } catch (error) {
-      console.error('データ圧縮エラー:', error);
-      throw error;
+      console.error('❌ データ圧縮エラー:', error);
+      throw new Error('データ圧縮に失敗しました');
     }
   };
 
-  // データの展開
-  const decompressData = (compressedData: string): StoredStockData => {
+  // データ解凍関数
+  const decompressData = (base64String: string): string => {
     try {
-      const compressed = Uint8Array.from(atob(compressedData), c => c.charCodeAt(0));
-      const decompressed = pako.ungzip(compressed, { to: 'string' });
-      return JSON.parse(decompressed);
+      console.log('📤 データ解凍開始...');
+
+      // Base64デコード
+      const binaryString = atob(base64String);
+      const compressed = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        compressed[i] = binaryString.charCodeAt(i);
+      }
+
+      // pako.inflateで解凍
+      const decompressed = pako.inflate(compressed);
+
+      // Uint8ArrayをUTF-8文字列に変換
+      const decoder = new TextDecoder();
+      const result = decoder.decode(decompressed);
+
+      console.log('✅ 解凍完了');
+      return result;
     } catch (error) {
-      console.error('データ展開エラー:', error);
-      throw error;
+      console.error('❌ データ解凍エラー:', error);
+      throw new Error('データ解凍に失敗しました');
     }
   };
 
-  // 株価データの保存（nullデータ警告情報対応）
+  // 圧縮データかどうかを判定
+  const isCompressedData = (data: string): boolean => {
+    // Base64文字列の特徴で判定
+    const base64Pattern = /^[A-Za-z0-9+/]*={0,2}$/;
+    return base64Pattern.test(data) && data.length > 100;
+  };
+
+  // 初回読み込み
+  useEffect(() => {
+    loadStoredData();
+    loadFavorites();
+    loadHoldings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // localStorageからデータを読み込み（圧縮対応版 + SSR対応）
+  const loadStoredData = () => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const rawData = localStorage.getItem(STORAGE_KEYS.STOCK_DATA);
+
+      if (!rawData) {
+        console.log('📭 localStorage: データが見つかりません');
+        setStoredData(null);
+        return;
+      }
+
+      let parsedData: StoredStockData;
+
+      // 圧縮データかどうかを判定
+      if (isCompressedData(rawData)) {
+        console.log('🗜️ 圧縮データを検出、解凍中...');
+        const decompressedData = decompressData(rawData);
+        parsedData = JSON.parse(decompressedData);
+        parsedData.isCompressed = true; // 圧縮フラグを設定
+      } else {
+        console.log('📄 非圧縮データを検出');
+        parsedData = JSON.parse(rawData);
+        parsedData.isCompressed = false;
+      }
+
+      // データバージョンチェック（旧バージョンも互換性保持）
+      if (parsedData.version !== DATA_VERSION && parsedData.version !== '1.0.0' && parsedData.version !== '1.1.0') {
+        console.warn(`⚠️ データバージョンが古いため削除: ${parsedData.version} → ${DATA_VERSION}`);
+        localStorage.removeItem(STORAGE_KEYS.STOCK_DATA);
+        setStoredData(null);
+        return;
+      }
+
+      // バージョンを最新に更新、null警告情報が存在しない場合は初期化
+      if (parsedData.version !== DATA_VERSION) {
+        parsedData.version = DATA_VERSION;
+        if (!parsedData.nullDataWarning) {
+          parsedData.nullDataWarning = {
+            hasNullData: false,
+            totalStocksWithNullData: 0,
+            totalNullDays: 0,
+            lastOccurrence: '',
+            summary: ''
+          };
+        }
+      }
+
+      console.log(`✅ localStorage: ${parsedData.totalStocks}銘柄のデータを読み込み`);
+      console.log(`📅 最終更新: ${parsedData.lastUpdate}`);
+      console.log(`🗜️ 圧縮状態: ${parsedData.isCompressed ? '圧縮済み' : '非圧縮'}`);
+
+      if (parsedData.nullDataWarning?.hasNullData) {
+        console.log(`⚠️ 前回のnullデータ警告: ${parsedData.nullDataWarning.summary}`);
+      }
+
+      setStoredData(parsedData);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
+      console.error('❌ localStorage読み込みエラー:', errorMessage);
+      setError(`データ読み込みエラー: ${errorMessage}`);
+
+      // 破損データを削除
+      localStorage.removeItem(STORAGE_KEYS.STOCK_DATA);
+      setStoredData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // お気に入りデータを読み込み（SSR対応）
+  const loadFavorites = () => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    try {
+      const rawFavorites = localStorage.getItem(STORAGE_KEYS.FAVORITES);
+
+      if (!rawFavorites) {
+        console.log('📭 localStorage: お気に入りデータが見つかりません');
+        setFavorites([]);
+        return;
+      }
+
+      const parsedFavorites: FavoritesData = JSON.parse(rawFavorites);
+
+      // バージョンチェック
+      if (parsedFavorites.version !== FAVORITES_VERSION) {
+        console.warn(`⚠️ お気に入りデータのバージョンが古いため削除: ${parsedFavorites.version} → ${FAVORITES_VERSION}`);
+        localStorage.removeItem(STORAGE_KEYS.FAVORITES);
+        setFavorites([]);
+        return;
+      }
+
+      console.log(`✅ localStorage: ${parsedFavorites.favorites.length}件のお気に入りを読み込み`);
+      setFavorites(parsedFavorites.favorites);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
+      console.error('❌ お気に入り読み込みエラー:', errorMessage);
+      setFavorites([]);
+
+      // 破損データを削除
+      localStorage.removeItem(STORAGE_KEYS.FAVORITES);
+    }
+  };
+
+  // 保有銘柄データを読み込み（SSR対応）
+  const loadHoldings = () => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    try {
+      const rawHoldings = localStorage.getItem(STORAGE_KEYS.HOLDINGS);
+
+      if (!rawHoldings) {
+        console.log('📭 localStorage: 保有銘柄データが見つかりません');
+        setHoldings([]);
+        return;
+      }
+
+      const parsedHoldings: HoldingsData = JSON.parse(rawHoldings);
+
+      // バージョンチェック
+      if (parsedHoldings.version !== HOLDINGS_VERSION) {
+        console.warn(`⚠️ 保有銘柄データのバージョンが古いため削除: ${parsedHoldings.version} → ${HOLDINGS_VERSION}`);
+        localStorage.removeItem(STORAGE_KEYS.HOLDINGS);
+        setHoldings([]);
+        return;
+      }
+
+      console.log(`✅ localStorage: ${parsedHoldings.holdings.length}件の保有銘柄を読み込み`);
+      setHoldings(parsedHoldings.holdings);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
+      console.error('❌ 保有銘柄読み込みエラー:', errorMessage);
+      setHoldings([]);
+
+      // 破損データを削除
+      localStorage.removeItem(STORAGE_KEYS.HOLDINGS);
+    }
+  };
+
+  // お気に入りデータを保存（SSR対応）
+  const saveFavorites = (newFavorites: string[]) => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    try {
+      const dataToSave: FavoritesData = {
+        favorites: newFavorites,
+        lastUpdate: new Date().toISOString(),
+        version: FAVORITES_VERSION
+      };
+
+      const jsonData = JSON.stringify(dataToSave);
+      localStorage.setItem(STORAGE_KEYS.FAVORITES, jsonData);
+      setFavorites(newFavorites);
+
+      console.log(`✅ お気に入り保存完了: ${newFavorites.length}件`);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
+      console.error('❌ お気に入り保存エラー:', errorMessage);
+      setError(`お気に入り保存エラー: ${errorMessage}`);
+    }
+  };
+
+  // 保有銘柄データを保存（SSR対応）
+  const saveHoldings = (newHoldings: string[]) => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    try {
+      const dataToSave: HoldingsData = {
+        holdings: newHoldings,
+        lastUpdate: new Date().toISOString(),
+        version: HOLDINGS_VERSION
+      };
+
+      const jsonData = JSON.stringify(dataToSave);
+      localStorage.setItem(STORAGE_KEYS.HOLDINGS, jsonData);
+      setHoldings(newHoldings);
+
+      console.log(`✅ 保有銘柄保存完了: ${newHoldings.length}件`);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
+      console.error('❌ 保有銘柄保存エラー:', errorMessage);
+      setError(`保有銘柄保存エラー: ${errorMessage}`);
+    }
+  };
+
+  // localStorageにデータを保存（4.7MB超過時自動圧縮対応版 + SSR対応 + null関連実装対応）
   const saveStockData = (
-    stocks: StoredStock[],
+    stocks: StoredStock[], 
     dailyDataMap: Record<string, DailyData[]>,
     nullDataSummary?: {
       totalStocksWithNullData: number;
@@ -189,114 +432,80 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     if (typeof window === 'undefined') return;
 
     try {
-      const now = new Date().toISOString();
+      console.log(`💾 localStorage: ${stocks.length}銘柄のデータを保存開始...`);
+
       const nullWarning = generateNullWarningInfo(nullDataSummary);
 
       const dataToSave: StoredStockData = {
         stocks,
         dailyDataMap,
-        lastUpdate: now,
+        lastUpdate: new Date().toISOString(),
         version: DATA_VERSION,
         totalStocks: stocks.length,
+        isCompressed: false, // 初期は非圧縮
         nullDataWarning: nullWarning
       };
 
-      const jsonString = JSON.stringify(dataToSave);
-      const sizeInBytes = new Blob([jsonString]).size;
+      const jsonData = JSON.stringify(dataToSave);
+      const originalSizeInMB = (jsonData.length / 1024 / 1024).toFixed(2);
 
-      console.log(`💾 保存するデータサイズ: ${(sizeInBytes / 1024 / 1024).toFixed(2)}MB`);
+      console.log(`📊 元データサイズ: ${originalSizeInMB}MB`);
 
       if (nullWarning) {
         console.log(`⚠️ nullデータ警告情報を保存: ${nullWarning.summary}`);
       }
 
-      if (sizeInBytes > COMPRESSION_THRESHOLD) {
-        console.log('🗜️ データが5MBを超えたため圧縮します...');
-        dataToSave.isCompressed = true;
-        const compressed = compressData(dataToSave);
-        localStorage.setItem(STORAGE_KEYS.STOCK_DATA, compressed);
+      let finalData: string;
+      let wasCompressed = false;
+
+      // 4.7MBを超える場合は圧縮
+      if (jsonData.length > COMPRESSION_THRESHOLD) {
+        console.log('⚠️ データサイズが4.7MBを超えているため、圧縮を実行します');
+
+        try {
+          finalData = compressData(jsonData);
+          wasCompressed = true;
+
+          // 圧縮後のデータサイズをチェック
+          if (finalData.length > COMPRESSION_THRESHOLD) {
+            throw new Error(`圧縮後もデータサイズが制限を超えています: ${(finalData.length / 1024 / 1024).toFixed(2)}MB（制限: 4.7MB）`);
+          }
+
+        } catch (compressionError) {
+          console.error('❌ 圧縮処理に失敗:', compressionError);
+          throw new Error(`圧縮処理に失敗しました: ${compressionError instanceof Error ? compressionError.message : '不明なエラー'}`);
+        }
+
       } else {
-        localStorage.setItem(STORAGE_KEYS.STOCK_DATA, jsonString);
+        console.log('📝 データサイズが4.7MB以下のため、非圧縮で保存します');
+        finalData = jsonData;
       }
 
-      setStoredData(dataToSave);
+      const finalSizeInMB = (finalData.length / 1024 / 1024).toFixed(2);
+      console.log(`📊 最終データサイズ: ${finalSizeInMB}MB (${wasCompressed ? '圧縮済み' : '非圧縮'})`);
+
+      // localStorage最終チェック
+      if (finalData.length > COMPRESSION_THRESHOLD) {
+        throw new Error(`データサイズが制限を超えています: ${finalSizeInMB}MB（制限: 4.7MB）`);
+      }
+
+      localStorage.setItem(STORAGE_KEYS.STOCK_DATA, finalData);
+
+      // stateの更新（圧縮フラグも更新）
+      const updatedData = { ...dataToSave, isCompressed: wasCompressed };
+      setStoredData(updatedData);
       setError(null);
 
-      console.log(`✅ 株価データ保存完了: ${stocks.length}銘柄`);
+      console.log(`✅ localStorage: 保存完了 (${finalSizeInMB}MB, ${wasCompressed ? '圧縮済み' : '非圧縮'})`);
 
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '保存エラー';
-      console.error('💾 株価データ保存エラー:', errorMessage);
-      setError(`データ保存に失敗しました: ${errorMessage}`);
+      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
+      console.error('❌ localStorage保存エラー:', errorMessage);
+      setError(`データ保存エラー: ${errorMessage}`);
     }
   };
 
-  // 株価データの読み込み（SSR対応）
-  const loadStockData = () => {
-    // サーバーサイドでは何もしない
-    if (typeof window === 'undefined') {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const stored = localStorage.getItem(STORAGE_KEYS.STOCK_DATA);
-      if (!stored) {
-        console.log('📭 保存された株価データがありません');
-        setStoredData(null);
-        return;
-      }
-
-      let data: StoredStockData;
-
-      try {
-        // まず通常のJSONとして試行
-        data = JSON.parse(stored);
-        if (data.isCompressed) {
-          throw new Error('圧縮データです');
-        }
-      } catch {
-        // 圧縮データとして展開を試行
-        console.log('🗜️ 圧縮データを展開中...');
-        data = decompressData(stored);
-      }
-
-      // バージョンチェック
-      if (!data.version || data.version !== DATA_VERSION) {
-        console.warn(`⚠️ データバージョンが古いです: ${data.version} → ${DATA_VERSION}`);
-        // 古いバージョンの場合、nullDataWarningが存在しない可能性がある
-        if (!data.nullDataWarning) {
-          data.nullDataWarning = {
-            hasNullData: false,
-            totalStocksWithNullData: 0,
-            totalNullDays: 0,
-            lastOccurrence: '',
-            summary: ''
-          };
-        }
-      }
-
-      setStoredData(data);
-      console.log(`📊 株価データ読み込み完了: ${data.totalStocks}銘柄`);
-
-      if (data.nullDataWarning?.hasNullData) {
-        console.log(`⚠️ 前回のnullデータ警告: ${data.nullDataWarning.summary}`);
-      }
-
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '読み込みエラー';
-      console.error('📊 株価データ読み込みエラー:', errorMessage);
-      setError(`データ読み込みに失敗しました: ${errorMessage}`);
-      setStoredData(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // データの削除（SSR対応）
+  // localStorageのデータをクリア（SSR対応）
   const clearStoredData = () => {
     // サーバーサイドでは何もしない
     if (typeof window === 'undefined') return;
@@ -305,14 +514,15 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
       localStorage.removeItem(STORAGE_KEYS.STOCK_DATA);
       setStoredData(null);
       setError(null);
-      console.log('🗑️ 株価データを削除しました');
+      console.log('🗑️ localStorage: データを削除しました');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '削除エラー';
-      setError(`データ削除に失敗しました: ${errorMessage}`);
+      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
+      console.error('❌ localStorageクリアエラー:', errorMessage);
+      setError(`データクリアエラー: ${errorMessage}`);
     }
   };
 
-  // 特定銘柄のデータ取得
+  // 特定銘柄のデータを取得
   const getStoredStock = (stockCode: string): { stock: StoredStock; dailyData: DailyData[] } | null => {
     if (!storedData) return null;
 
@@ -324,122 +534,72 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     return { stock, dailyData };
   };
 
-  // お気に入り機能の実装（SSR対応）
-  const loadFavorites = () => {
-    // サーバーサイドでは何もしない
-    if (typeof window === 'undefined') return;
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.FAVORITES);
-      if (stored) {
-        const data: FavoritesData = JSON.parse(stored);
-        setFavorites(data.favorites || []);
-      }
-    } catch (err) {
-      console.error('お気に入り読み込みエラー:', err);
-    }
-  };
-
-  const saveFavorites = (newFavorites: string[]) => {
-    // サーバーサイドでは何もしない
-    if (typeof window === 'undefined') return;
-
-    try {
-      const data: FavoritesData = {
-        favorites: newFavorites,
-        lastUpdate: new Date().toISOString(),
-        version: FAVORITES_VERSION
-      };
-      localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(data));
-      setFavorites(newFavorites);
-    } catch (err) {
-      console.error('お気に入り保存エラー:', err);
-    }
-  };
-
-  // 保有銘柄機能の実装（SSR対応）
-  const loadHoldings = () => {
-    // サーバーサイドでは何もしない
-    if (typeof window === 'undefined') return;
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.HOLDINGS);
-      if (stored) {
-        const data: HoldingsData = JSON.parse(stored);
-        setHoldings(data.holdings || []);
-      }
-    } catch (err) {
-      console.error('保有銘柄読み込みエラー:', err);
-    }
-  };
-
-  const saveHoldings = (newHoldings: string[]) => {
-    // サーバーサイドでは何もしない
-    if (typeof window === 'undefined') return;
-
-    try {
-      const data: HoldingsData = {
-        holdings: newHoldings,
-        lastUpdate: new Date().toISOString(),
-        version: HOLDINGS_VERSION
-      };
-      localStorage.setItem(STORAGE_KEYS.HOLDINGS, JSON.stringify(data));
-      setHoldings(newHoldings);
-    } catch (err) {
-      console.error('保有銘柄保存エラー:', err);
-    }
-  };
-
-  // 初回読み込み
-  useEffect(() => {
-    loadStockData();
-    loadFavorites();
-    loadHoldings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 計算プロパティ
-  const isDataAvailable = storedData !== null && storedData.stocks.length > 0;
-
-  const dataAge = storedData ? (() => {
-    const lastUpdate = new Date(storedData.lastUpdate);
-    const year = lastUpdate.getFullYear();
-    const month = String(lastUpdate.getMonth() + 1).padStart(2, '0');
-    const day = String(lastUpdate.getDate()).padStart(2, '0');
-    const hour = String(lastUpdate.getHours()).padStart(2, '0');
-    const minute = String(lastUpdate.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hour}:${minute}`;
-  })() : null;
-
-  const storageUsage = (() => {
-    // サーバーサイドでは0を返す
-    if (typeof window === 'undefined') return '0B';
-
-    let totalSize = 0;
-    for (const key of Object.values(STORAGE_KEYS)) {
-      const item = localStorage.getItem(key);
-      if (item) {
-        totalSize += new Blob([item]).size;
-      }
-    }
-    return totalSize < 1024 ? `${totalSize}B` :
-      totalSize < 1024 * 1024 ? `${(totalSize / 1024).toFixed(1)}KB` :
-        `${(totalSize / 1024 / 1024).toFixed(1)}MB`;
-  })();
-
-  // お気に入り関連の関数
+  // お気に入り追加（SSR対応）
   const addFavorite = (stockCode: string) => {
-    if (!favorites.includes(stockCode)) {
-      saveFavorites([...favorites, stockCode]);
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    // localStorage から最新のお気に入りデータを直接読み込む
+    let currentFavorites: string[] = [];
+
+    try {
+      const rawFavorites = localStorage.getItem(STORAGE_KEYS.FAVORITES);
+      if (rawFavorites) {
+        const parsedFavorites: FavoritesData = JSON.parse(rawFavorites);
+        if (parsedFavorites.version === FAVORITES_VERSION) {
+          currentFavorites = parsedFavorites.favorites;
+        }
+      }
+    } catch (err) {
+      console.error('❌ お気に入り読み込みエラー:', err);
+      currentFavorites = [];
     }
+
+    // 既に登録済みかチェック
+    if (currentFavorites.includes(stockCode)) {
+      console.log(`⚠️ ${stockCode} は既にお気に入りに登録済みです`);
+      return;
+    }
+
+    // 新しいお気に入りリストを作成
+    const newFavorites = [...currentFavorites, stockCode];
+    saveFavorites(newFavorites);
+    console.log(`⭐ ${stockCode} をお気に入りに追加しました`);
   };
 
+  // お気に入り削除（SSR対応）
   const removeFavorite = (stockCode: string) => {
-    saveFavorites(favorites.filter(code => code !== stockCode));
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    // localStorage から最新のお気に入りデータを直接読み込む
+    let currentFavorites: string[] = [];
+
+    try {
+      const rawFavorites = localStorage.getItem(STORAGE_KEYS.FAVORITES);
+      if (rawFavorites) {
+        const parsedFavorites: FavoritesData = JSON.parse(rawFavorites);
+        if (parsedFavorites.version === FAVORITES_VERSION) {
+          currentFavorites = parsedFavorites.favorites;
+        }
+      }
+    } catch (err) {
+      console.error('❌ お気に入り読み込みエラー:', err);
+      currentFavorites = [];
+    }
+
+    // お気に入りから削除
+    const newFavorites = currentFavorites.filter(code => code !== stockCode);
+    saveFavorites(newFavorites);
+    console.log(`🗑️ ${stockCode} をお気に入りから削除しました`);
   };
 
-  const isFavorite = (stockCode: string) => favorites.includes(stockCode);
+  // お気に入り状態チェック
+  const isFavorite = (stockCode: string): boolean => {
+    return favorites.includes(stockCode);
+  };
 
+  // お気に入りのトグル（追加/削除の切り替え）
   const toggleFavorite = (stockCode: string) => {
     if (isFavorite(stockCode)) {
       removeFavorite(stockCode);
@@ -448,24 +608,87 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     }
   };
 
+  // お気に入り銘柄のデータを取得（銘柄コード昇順）
   const getFavoriteStocks = (): StoredStock[] => {
     if (!storedData) return [];
-    return storedData.stocks.filter(stock => favorites.includes(stock.code));
+
+    // お気に入り銘柄のデータを取得
+    const favoriteStocks = storedData.stocks.filter(stock => favorites.includes(stock.code));
+
+    // 銘柄コード（数値）で昇順ソート
+    return favoriteStocks.sort((a, b) => {
+      const codeA = parseInt(a.code, 10);
+      const codeB = parseInt(b.code, 10);
+      return codeA - codeB;
+    });
   };
 
-  // 保有銘柄関連の関数
+  // 保有銘柄追加（SSR対応）
   const addHolding = (stockCode: string) => {
-    if (!holdings.includes(stockCode)) {
-      saveHoldings([...holdings, stockCode]);
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    // localStorage から最新の保有銘柄データを直接読み込む
+    let currentHoldings: string[] = [];
+
+    try {
+      const rawHoldings = localStorage.getItem(STORAGE_KEYS.HOLDINGS);
+      if (rawHoldings) {
+        const parsedHoldings: HoldingsData = JSON.parse(rawHoldings);
+        if (parsedHoldings.version === HOLDINGS_VERSION) {
+          currentHoldings = parsedHoldings.holdings;
+        }
+      }
+    } catch (err) {
+      console.error('❌ 保有銘柄読み込みエラー:', err);
+      currentHoldings = [];
     }
+
+    // 既に登録済みかチェック
+    if (currentHoldings.includes(stockCode)) {
+      console.log(`⚠️ ${stockCode} は既に保有銘柄に登録済みです`);
+      return;
+    }
+
+    // 新しい保有銘柄リストを作成
+    const newHoldings = [...currentHoldings, stockCode];
+    saveHoldings(newHoldings);
+    console.log(`💼 ${stockCode} を保有銘柄に追加しました`);
   };
 
+  // 保有銘柄削除（SSR対応）
   const removeHolding = (stockCode: string) => {
-    saveHoldings(holdings.filter(code => code !== stockCode));
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    // localStorage から最新の保有銘柄データを直接読み込む
+    let currentHoldings: string[] = [];
+
+    try {
+      const rawHoldings = localStorage.getItem(STORAGE_KEYS.HOLDINGS);
+      if (rawHoldings) {
+        const parsedHoldings: HoldingsData = JSON.parse(rawHoldings);
+        if (parsedHoldings.version === HOLDINGS_VERSION) {
+          currentHoldings = parsedHoldings.holdings;
+        }
+      }
+    } catch (err) {
+      console.error('❌ 保有銘柄読み込みエラー:', err);
+      currentHoldings = [];
+    }
+
+    // 保有銘柄から削除
+    const newHoldings = currentHoldings.filter(code => code !== stockCode);
+    saveHoldings(newHoldings);
+    console.log(`🗑️ ${stockCode} を保有銘柄から削除しました`);
   };
 
-  const isHolding = (stockCode: string) => holdings.includes(stockCode);
+  // 保有銘柄状態チェック
+  const isHolding = (stockCode: string): boolean => {
+    return holdings.includes(stockCode);
+  };
 
+  // 保有銘柄のトグル（追加/削除の切り替え）
   const toggleHolding = (stockCode: string) => {
     if (isHolding(stockCode)) {
       removeHolding(stockCode);
@@ -474,23 +697,68 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     }
   };
 
+  // 保有銘柄のデータを取得
   const getHoldingStocks = (): StoredStock[] => {
     if (!storedData) return [];
+
     return storedData.stocks.filter(stock => holdings.includes(stock.code));
   };
 
+  // データの存在確認
+  const isDataAvailable = storedData !== null && storedData.stocks.length > 0;
+
+  // データの日時を計算（yyyy-mm-dd hh:mm形式）
+  const dataAge = storedData ? (() => {
+    const lastUpdate = new Date(storedData.lastUpdate);
+
+    // yyyy-mm-dd hh:mm形式にフォーマット
+    const year = lastUpdate.getFullYear();
+    const month = String(lastUpdate.getMonth() + 1).padStart(2, '0');
+    const day = String(lastUpdate.getDate()).padStart(2, '0');
+    const hours = String(lastUpdate.getHours()).padStart(2, '0');
+    const minutes = String(lastUpdate.getMinutes()).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  })() : null;
+
+  // ストレージ使用量を計算（圧縮対応版 + SSR対応）
+  const storageUsage = (() => {
+    // サーバーサイドでは0Bを返す
+    if (typeof window === 'undefined') return '0B';
+
+    try {
+      const stockData = localStorage.getItem(STORAGE_KEYS.STOCK_DATA);
+      const favoritesData = localStorage.getItem(STORAGE_KEYS.FAVORITES);
+      const holdingsData = localStorage.getItem(STORAGE_KEYS.HOLDINGS);
+
+      const stockDataSize = stockData ? stockData.length : 0;
+      const favoritesDataSize = favoritesData ? favoritesData.length : 0;
+      const holdingsDataSize = holdingsData ? holdingsData.length : 0;
+      const totalSize = stockDataSize + favoritesDataSize + holdingsDataSize;
+
+      const sizeInMB = (totalSize / 1024 / 1024).toFixed(2);
+
+      // 圧縮状態を表示
+      let compressionInfo = '';
+      if (stockData && isCompressedData(stockData)) {
+        compressionInfo = ' (圧縮済み)';
+      } else if (stockData) {
+        compressionInfo = ' (非圧縮)';
+      }
+
+      return `${sizeInMB}MB${compressionInfo}`;
+    } catch {
+      return '不明';
+    }
+  })();
+
   return {
-    // データ読み込み
     storedData,
     loading,
     error,
-
-    // データ操作
     saveStockData,
     clearStoredData,
     getStoredStock,
-
-    // ステータス
     isDataAvailable,
     dataAge,
     storageUsage,
