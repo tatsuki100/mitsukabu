@@ -1,6 +1,6 @@
 // ========================================
 // src/hooks/useStockDataStorage.ts
-// 4MB超過時自動圧縮対応版 - localStorage容量制限対策
+// SSR対応版 - localStorage容量制限対策
 // ========================================
 
 import { useState, useEffect } from 'react';
@@ -185,6 +185,9 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
       }>;
     }
   ) => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
     try {
       const now = new Date().toISOString();
       const nullWarning = generateNullWarningInfo(nullDataSummary);
@@ -228,8 +231,14 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     }
   };
 
-  // 株価データの読み込み
+  // 株価データの読み込み（SSR対応）
   const loadStockData = () => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -287,8 +296,11 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     }
   };
 
-  // データの削除
+  // データの削除（SSR対応）
   const clearStoredData = () => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
     try {
       localStorage.removeItem(STORAGE_KEYS.STOCK_DATA);
       setStoredData(null);
@@ -312,8 +324,11 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     return { stock, dailyData };
   };
 
-  // お気に入り機能の実装（既存のものを維持）
+  // お気に入り機能の実装（SSR対応）
   const loadFavorites = () => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.FAVORITES);
       if (stored) {
@@ -326,6 +341,9 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
   };
 
   const saveFavorites = (newFavorites: string[]) => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
     try {
       const data: FavoritesData = {
         favorites: newFavorites,
@@ -339,8 +357,11 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     }
   };
 
-  // 保有銘柄機能の実装（既存のものを維持）
+  // 保有銘柄機能の実装（SSR対応）
   const loadHoldings = () => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.HOLDINGS);
       if (stored) {
@@ -353,6 +374,9 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
   };
 
   const saveHoldings = (newHoldings: string[]) => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
     try {
       const data: HoldingsData = {
         holdings: newHoldings,
@@ -389,6 +413,9 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
   })() : null;
 
   const storageUsage = (() => {
+    // サーバーサイドでは0を返す
+    if (typeof window === 'undefined') return '0B';
+
     let totalSize = 0;
     for (const key of Object.values(STORAGE_KEYS)) {
       const item = localStorage.getItem(key);
