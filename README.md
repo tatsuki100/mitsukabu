@@ -30,7 +30,7 @@ npm run dev              # 開発サーバー起動（localhost:3000）
 git status               # 変更されたファイルを確認
 git add .                # 変更をステージング
 git commit -m "update"   # コミット
-git push origin main.    # GitHubにプッシュ
+git push origin main    # GitHubにプッシュ
 
 # その他：ビルド関連
 npm run build            # 本番用ビルド
