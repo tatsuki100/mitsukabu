@@ -5,128 +5,76 @@
 
 'use client';
 
+import { Suspense } from 'react';
 import { useStockDataStorage } from '@/hooks/useStockDataStorage';
+import { usePagination } from '@/hooks/usePagination';
 import StockCard from '@/components/StockCard';
+import Pagination from '@/components/Pagination';
+import SearchBox from '@/components/SearchBox';
+import FloatingPageNav from '@/components/FloatingPageNav';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Star } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Star } from 'lucide-react';
 
-const FavoritesPage = () => {
+// ローディングコンポーネント
+const FavoritesLoading = () => (
+  <div className="container mx-auto px-4 py-8">
+    <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
+      <h2 className="text-xl font-bold mb-2">読み込み中...</h2>
+      <p>株価データを読み込んでいます。</p>
+    </div>
+  </div>
+);
+
+const FavoritesContent = () => {
   const router = useRouter();
   
   // localStorage管理
-  const { 
-    // storedData, 
-    loading, 
-    error, 
+  const {
+    loading,
+    error,
     isDataAvailable,
     dataAge,
     getFavoriteStocks,
     favoritesCount
   } = useStockDataStorage();
 
-  // ページネーション用のstate
-  const [currentPage, setCurrentPage] = useState(0); // 現在のページ（0ベース）
-  const itemsPerPage = 32; // 1ページあたりの表示数（固定）
-
   // お気に入り銘柄を取得
   const favoriteStocks = getFavoriteStocks();
 
-  // データが変わった時にページをリセット
-  useEffect(() => {
-    setCurrentPage(0);
-  }, [favoriteStocks]);
+  // 検索機能用のstate
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // ページネーション計算
-  const totalItems = favoriteStocks.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const startIndex = currentPage * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-  const displayStocks = favoriteStocks.slice(startIndex, endIndex);
-
-  // ページ変更ハンドラー
-  const handlePageChange = useCallback((newPage: number) => {
-    if (newPage >= 0 && newPage < totalPages) {
-      setCurrentPage(newPage);
-      // ページ変更時にトップにスクロール
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [totalPages]);
-
-  // キーボード操作のハンドラー
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    // 入力フィールドにフォーカスがある場合は無視
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-      return;
+  // 検索結果をメモ化（パフォーマンス最適化）
+  const filteredStocks = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return favoriteStocks;
     }
 
-    switch (event.key) {
-      case 'ArrowLeft':
-        event.preventDefault();
-        if (currentPage > 0) {
-          handlePageChange(currentPage - 1);
-        }
-        break;
-      case 'ArrowRight':
-        event.preventDefault();
-        if (currentPage < totalPages - 1) {
-          handlePageChange(currentPage + 1);
-        }
-        break;
-      case 'Home':
-        event.preventDefault();
-        handlePageChange(0);
-        break;
-      case 'End':
-        event.preventDefault();
-        handlePageChange(totalPages - 1);
-        break;
-    }
-  }, [currentPage, totalPages, handlePageChange]);
+    const query = searchQuery.trim().toLowerCase();
+    return favoriteStocks.filter(stock => {
+      // 銘柄コードと銘柄名の両方で検索
+      const codeMatch = stock.code.toLowerCase().includes(query);
+      const nameMatch = stock.name.toLowerCase().includes(query);
+      return codeMatch || nameMatch;
+    });
+  }, [favoriteStocks, searchQuery]);
 
-  // キーボードイベントリスナーの設定
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    
-    // クリーンアップ
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleKeyDown]);
+  // ページネーション機能（カスタムHook）
+  const pagination = usePagination({
+    items: filteredStocks,
+    searchQuery: searchQuery,
+  });
 
-  // ページ番号の配列を生成（...省略対応）
-  const getPageNumbers = (): (number | string)[] => {
-    const pageNumbers: (number | string)[] = [];
-    const maxVisiblePages = 7; // 表示する最大ページ数
+  // 表示する銘柄をslice
+  const displayStocks = filteredStocks.slice(pagination.startIndex, pagination.endIndex);
 
-    if (totalPages <= maxVisiblePages) {
-      // 全ページ表示
-      for (let i = 0; i < totalPages; i++) {
-        pageNumbers.push(i);
-      }
-    } else {
-      // 省略表示
-      if (currentPage <= 3) {
-        // 最初の方のページ
-        for (let i = 0; i < 5; i++) pageNumbers.push(i);
-        pageNumbers.push('...');
-        pageNumbers.push(totalPages - 1);
-      } else if (currentPage >= totalPages - 4) {
-        // 最後の方のページ
-        pageNumbers.push(0);
-        pageNumbers.push('...');
-        for (let i = totalPages - 5; i < totalPages; i++) pageNumbers.push(i);
-      } else {
-        // 中間のページ
-        pageNumbers.push(0);
-        pageNumbers.push('...');
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) pageNumbers.push(i);
-        pageNumbers.push('...');
-        pageNumbers.push(totalPages - 1);
-      }
-    }
+  // 検索が有効かどうかを判定
+  const isSearchActive = searchQuery.trim().length > 0;
 
-    return pageNumbers;
+  // 検索クリアハンドラー
+  const handleClearSearch = () => {
+    setSearchQuery('');
   };
 
   // ローディング中
@@ -216,7 +164,16 @@ const FavoritesPage = () => {
         <div className="flex justify-between items-center mt-2">
           <div className="text-sm text-gray-500">
             <p className='mb-3'>最終更新：{dataAge}</p>
-            <p>{startIndex + 1}〜{endIndex}銘柄 / {totalItems}銘柄</p>
+            <p>
+              {isSearchActive ? (
+                <>
+                  検索結果：{pagination.startIndex + 1}〜{pagination.endIndex}銘柄 / {pagination.totalItems}銘柄
+                  <span className="ml-2 text-blue-600">（全{favoritesCount}銘柄中）</span>
+                </>
+              ) : (
+                `${pagination.startIndex + 1}〜${pagination.endIndex}銘柄 / ${pagination.totalItems}銘柄`
+              )}
+            </p>
           </div>
           <div className="space-x-2">
             <button
@@ -229,86 +186,24 @@ const FavoritesPage = () => {
         </div>
       </div>
 
+      {/* 検索ボックス */}
+      <div className="mb-6">
+        <SearchBox
+          value={searchQuery}
+          onChange={setSearchQuery}
+          onClear={handleClearSearch}
+        />
+      </div>
+
       {/* ページネーション（上部） */}
-      {totalPages > 1 && (
-        <div className="mb-6 flex justify-center">
-          <nav className="flex items-center space-x-1">
-            {/* 最初のページ */}
-            <button
-              onClick={() => handlePageChange(0)}
-              disabled={currentPage === 0}
-              className={`p-2 rounded ${
-                currentPage === 0 
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-blue-600 hover:bg-blue-50'
-              }`}
-              title="最初のページ（Homeキー）"
-            >
-              <ChevronsLeft className="w-4 h-4" />
-            </button>
-
-            {/* 前のページ */}
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 0}
-              className={`p-2 rounded ${
-                currentPage === 0 
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-blue-600 hover:bg-blue-50'
-              }`}
-              title="前のページ（←キー）"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            {/* ページ番号 */}
-            {getPageNumbers().map((pageNum, index) => (
-              <button
-                key={index}
-                onClick={() => typeof pageNum === 'number' ? handlePageChange(pageNum) : undefined}
-                disabled={pageNum === '...'}
-                className={`px-3 py-2 rounded text-sm ${
-                  pageNum === currentPage
-                    ? 'bg-blue-600 text-white font-bold'
-                    : pageNum === '...'
-                    ? 'text-gray-400 cursor-default'
-                    : 'text-blue-600 hover:bg-blue-50'
-                }`}
-              >
-                {typeof pageNum === 'number' ? pageNum + 1 : pageNum}
-              </button>
-            ))}
-
-            {/* 次のページ */}
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages - 1}
-              className={`p-2 rounded ${
-                currentPage === totalPages - 1
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-blue-600 hover:bg-blue-50'
-              }`}
-              title="次のページ（→キー）"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            {/* 最後のページ */}
-            <button
-              onClick={() => handlePageChange(totalPages - 1)}
-              disabled={currentPage === totalPages - 1}
-              className={`p-2 rounded ${
-                currentPage === totalPages - 1
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-blue-600 hover:bg-blue-50'
-              }`}
-              title="最後のページ（Endキー）"
-            >
-              <ChevronsRight className="w-4 h-4" />
-            </button>
-          </nav>
-        </div>
-      )}
+      <div className="mb-6">
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          onPageChange={pagination.handlePageChange}
+          getPageNumbers={pagination.getPageNumbers}
+        />
+      </div>
 
       {/* 銘柄カード一覧 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -318,86 +213,31 @@ const FavoritesPage = () => {
       </div>
 
       {/* ページネーション（下部） */}
-      {totalPages > 1 && (
-        <div className="mt-8 flex justify-center">
-          <nav className="flex items-center space-x-1">
-            {/* 最初のページ */}
-            <button
-              onClick={() => handlePageChange(0)}
-              disabled={currentPage === 0}
-              className={`p-2 rounded ${
-                currentPage === 0 
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-blue-600 hover:bg-blue-50'
-              }`}
-              title="最初のページ（Homeキー）"
-            >
-              <ChevronsLeft className="w-4 h-4" />
-            </button>
+      <div className="mt-8">
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          onPageChange={pagination.handlePageChange}
+          getPageNumbers={pagination.getPageNumbers}
+        />
+      </div>
 
-            {/* 前のページ */}
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 0}
-              className={`p-2 rounded ${
-                currentPage === 0 
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-blue-600 hover:bg-blue-50'
-              }`}
-              title="前のページ（←キー）"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            {/* ページ番号 */}
-            {getPageNumbers().map((pageNum, index) => (
-              <button
-                key={index}
-                onClick={() => typeof pageNum === 'number' ? handlePageChange(pageNum) : undefined}
-                disabled={pageNum === '...'}
-                className={`px-3 py-2 rounded text-sm ${
-                  pageNum === currentPage
-                    ? 'bg-blue-600 text-white font-bold'
-                    : pageNum === '...'
-                    ? 'text-gray-400 cursor-default'
-                    : 'text-blue-600 hover:bg-blue-50'
-                }`}
-              >
-                {typeof pageNum === 'number' ? pageNum + 1 : pageNum}
-              </button>
-            ))}
-
-            {/* 次のページ */}
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages - 1}
-              className={`p-2 rounded ${
-                currentPage === totalPages - 1
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-blue-600 hover:bg-blue-50'
-              }`}
-              title="次のページ（→キー）"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            {/* 最後のページ */}
-            <button
-              onClick={() => handlePageChange(totalPages - 1)}
-              disabled={currentPage === totalPages - 1}
-              className={`p-2 rounded ${
-                currentPage === totalPages - 1
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-blue-600 hover:bg-blue-50'
-              }`}
-              title="最後のページ（Endキー）"
-            >
-              <ChevronsRight className="w-4 h-4" />
-            </button>
-          </nav>
-        </div>
-      )}
+      {/* フローティングページナビ（PC専用） */}
+      <FloatingPageNav
+        currentPage={pagination.currentPage}
+        totalPages={pagination.totalPages}
+        onPageChange={pagination.handlePageChange}
+      />
     </div>
+  );
+};
+
+// Suspenseでラップしたページコンポーネント
+const FavoritesPage = () => {
+  return (
+    <Suspense fallback={<FavoritesLoading />}>
+      <FavoritesContent />
+    </Suspense>
   );
 };
 

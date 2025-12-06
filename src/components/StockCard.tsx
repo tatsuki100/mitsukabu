@@ -172,6 +172,24 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
   // メモがあるかどうかを判定（空文字や空白のみの場合は「メモなし」と判定）
   const hasMemo = memoText.trim().length > 0;
 
+  // 最後に閲覧した銘柄かどうかを判定（同じページ種別の場合のみ）
+  const [isLastViewed, setIsLastViewed] = useState(false);
+
+  useEffect(() => {
+    const lastViewedData = sessionStorage.getItem('lastViewedStock');
+    if (lastViewedData) {
+      try {
+        const { code, page } = JSON.parse(lastViewedData);
+        // linkPrefixとnavigationModeの対応：stock→all、それ以外は同じ名前
+        const currentPage = linkPrefix === 'stock' ? 'all' : linkPrefix;
+        setIsLastViewed(code === stock.code && page === currentPage);
+      } catch {
+        // JSON解析失敗時は旧形式のデータなのでハイライトしない
+        setIsLastViewed(false);
+      }
+    }
+  }, [stock.code, linkPrefix]);
+
   // メモ欄の背景色を動的に決定
   const getMemoBackgroundClass = (): string => {
     if (hasMemo) {
@@ -181,8 +199,16 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
     }
   };
 
+  // カードの外枠クラスを動的に決定
+  const getCardBorderClass = (): string => {
+    if (isLastViewed) {
+      return 'ring-2 ring-blue-500 ring-offset-2'; // 最後に閲覧した銘柄：青い枠線
+    }
+    return '';
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow relative">
+    <div className={`bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow relative ${getCardBorderClass()}`}>
 
       <div className="flex gap-2 absolute top-3 right-3 z-10">
         {/* お気に入りボタン */}
@@ -213,7 +239,6 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
       <Link
         href={linkPath}
         className="block"
-        {...(linkPrefix === 'stock' ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
       >
         {/* ヘッダー Start */}
         <div className="border-b pb-2 mb-3 pr-24"> {/* 右側にお気に入りボタンの余白を確保 */}

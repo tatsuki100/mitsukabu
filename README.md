@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# みつかぶ (mitsukabu)
 
-## Getting Started
+JPX400銘柄の株価をローソク足チャートで一覧表示する日本語の株式スクリーニングWebアプリケーション
 
-First, run the development server:
+## 🔗 本番URL
+https://www.mitsukabu.com/
+
+## 📖 プロジェクト詳細ドキュメント
+
+**開発者の方へ：** プロジェクトの詳細な情報（技術スタック、アーキテクチャ、開発ガイド、コーディング規約など）は **[CLAUDE.md](./CLAUDE.md)** をご覧ください。
+
+CLAUDE.mdには以下の情報が含まれています：
+- プロジェクト概要・技術スタック
+- ディレクトリ構造
+- 主要機能の詳細
+- アーキテクチャとデータフロー
+- 開発コマンド
+- コーディング規約
+- 環境変数の設定
+- データ型定義
+- 将来の計画
+
+## 🚀 クイックスタート
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 開発サーバー起動
+npm run dev              # 開発サーバー起動（localhost:3000）
+
+#デプロイ（git push後、CI/CDが自動ビルド＆デプロイ）
+git status               # 変更されたファイルを確認
+git add .                # 変更をステージング
+git commit -m "update"   # コミット
+git push origin main.    # GitHubにプッシュ
+
+# その他：ビルド関連
+npm run build            # 本番用ビルド
+npm start                # 本番サーバー起動
+
+# その他：Lint
+npm run lint             # ESLint実行
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📝 特徴
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- ✅ 会員登録不要・完全無料
+- ✅ JPX400銘柄のローソク足チャート一覧表示
+- ✅ テクニカル指標（移動平均線、RSI、MACD）
+- ✅ スクリーニング機能（ターンバック、クロスV）
+- ✅ お気に入り・保有銘柄管理
+- ✅ 銘柄メモ機能
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+**詳細は [CLAUDE.md](./CLAUDE.md) を参照してください。**
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+*最終更新: 2025年12月6日*

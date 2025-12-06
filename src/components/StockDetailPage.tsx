@@ -125,6 +125,16 @@ const StockDetailPage = ({
     };
   }, [handleKeyDown]);
 
+  // 最後に閲覧した銘柄をsessionStorageに保存（ページ種別も含める）
+  useEffect(() => {
+    if (stockCode) {
+      sessionStorage.setItem('lastViewedStock', JSON.stringify({
+        code: stockCode,
+        page: navigationMode
+      }));
+    }
+  }, [stockCode, navigationMode]);
+
   // プルダウンの値が変更された時の処理
   const handleStockChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newStockCode = event.target.value;
