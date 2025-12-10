@@ -1,6 +1,6 @@
 // ========================================
 // src/hooks/useEmailBackup.ts
-// EmailJSを使った観察銘柄バックアップ機能
+// EmailJSを使った観察銘柄・検討銘柄バックアップ機能
 // ========================================
 
 import { useState } from 'react';
@@ -27,11 +27,12 @@ export const useEmailBackup = () => {
     emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
   };
 
-  // 観察銘柄リスト + メモをメール送信
+  // 観察銘柄・検討銘柄リスト + メモをメール送信
   const sendFavoritesBackup = async (
-    favorites: string[], 
+    favorites: string[],
     stockNames: { [key: string]: string },
-    allMemos: { [key: string]: string }
+    allMemos: { [key: string]: string },
+    considering: string[] = [] // 検討銘柄（オプション、後方互換性のためデフォルト空配列）
   ) => {
     setStatus('sending');
     setError(null);
@@ -41,10 +42,20 @@ export const useEmailBackup = () => {
       initEmailJS();
 
       // 観察銘柄リストを整形
-      const favoritesList = favorites.map((code, index) => {
-        const name = stockNames[code] || '銘柄名不明';
-        return `${index + 1}. ${code} - ${name}`;
-      }).join('\n');
+      const favoritesList = favorites.length > 0
+        ? favorites.map((code) => {
+            const name = stockNames[code] || '銘柄名不明';
+            return `${code} - ${name}`;
+          }).join('\n')
+        : '観察銘柄はありません。';
+
+      // 検討銘柄リストを整形（メモ付き）
+      const consideringList = considering.length > 0
+        ? considering.map((code) => {
+            const memo = allMemos[code]?.trim() || 'メモなし';
+            return `▼${code}\n${memo}`;
+          }).join('\n\n')
+        : '検討銘柄はありません。';
 
       // メモがある銘柄のリストを作成
       const memosWithContent = Object.entries(allMemos)
@@ -54,7 +65,7 @@ export const useEmailBackup = () => {
           return `${index + 1}. ${code} - ${name}：${memo}`;
         });
 
-      const memosList = memosWithContent.length > 0 
+      const memosList = memosWithContent.length > 0
         ? memosWithContent.join('\n')
         : 'メモが登録されている銘柄はありません。';
 
@@ -74,6 +85,8 @@ export const useEmailBackup = () => {
         to_email: EMAILJS_CONFIG.TO_EMAIL,
         favorites_count: favorites.length,
         favorites_list: favoritesList,
+        considering_count: considering.length,
+        considering_list: consideringList,
         memos_count: memosWithContent.length,
         memos_list: memosList,
         backup_date: backupDate

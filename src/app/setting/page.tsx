@@ -80,7 +80,9 @@ const SettingPage = () => {
     dataAge,
     storageUsage,
     favorites,
-    favoritesCount
+    favoritesCount,
+    considering,
+    consideringCount
   } = useStockDataStorage();
 
   // メモ管理
@@ -262,14 +264,14 @@ const SettingPage = () => {
     }
   };
 
-  // 観察銘柄のバックアップを実行
+  // 観察銘柄・検討銘柄のバックアップを実行
   const handleBackupFavorites = async () => {
     // メモデータを取得
     const allMemos = getAllMemos();
     const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
 
-    if (favoritesCount === 0 && memoCount === 0) {
-      alert('バックアップする観察銘柄もメモもありません。');
+    if (favoritesCount === 0 && consideringCount === 0 && memoCount === 0) {
+      alert('バックアップする観察銘柄・検討銘柄・メモがありません。');
       return;
     }
 
@@ -281,10 +283,10 @@ const SettingPage = () => {
       });
     }
 
-    const result = await sendFavoritesBackup(favorites, stockNames, allMemos);
+    const result = await sendFavoritesBackup(favorites, stockNames, allMemos, considering);
 
     if (result.success) {
-      alert('✅ 観察銘柄とメモをメールで送信しました！');
+      alert('✅ 観察銘柄・検討銘柄・メモをメールで送信しました！');
     } else {
       alert(`❌ メール送信に失敗しました: ${result.error}`);
     }
@@ -349,7 +351,7 @@ const SettingPage = () => {
         <p>※毎年8月末に最新のJPX400銘柄リストを更新してください。（<a href="https://www.torezista.com/tool/jpx400/" target='_blank' className='text-blue-500 underline'>ダウンロードリンク</a>）</p>
         <h2 className='mt-6 font-bold text-lg'>更新履歴</h2>
         <ul>
-          <li>2025.12.10 - 検討銘柄新設</li>
+          <li>2025.12.10 - 検討銘柄新設&バックアップメール改修</li>
           <li>2025.12.6 - ページネーション改修</li>
           <li>2025.11.29 - 3141上場廃止</li>
           <li>2025.09.18 - 株価データがnullの場合のスキップ表示を実装</li>
@@ -405,15 +407,15 @@ const SettingPage = () => {
         )}
       </div>
 
-      {/* 観察銘柄バックアップ */}
+      {/* 観察銘柄・検討銘柄バックアップ */}
       <div className="bg-green-50 border border-green-200 p-4 rounded">
-        <h2 className="text-lg font-bold mb-1">🔧 観察銘柄・メモバックアップ</h2>
+        <h2 className="text-lg font-bold mb-1">🔧 観察銘柄・検討銘柄・メモバックアップ</h2>
         <p className="text-gray-600 mb-3">
-          現在の観察銘柄一覧とメモをメールで送信します。
+          現在の観察銘柄・検討銘柄一覧とメモをメールで送信します。
           {(() => {
             const allMemos = getAllMemos();
             const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
-            return `（観察${favoritesCount}銘柄・メモ${memoCount}件）`;
+            return `（観察${favoritesCount}銘柄・検討${consideringCount}銘柄・メモ${memoCount}件）`;
           })()}
         </p>
         <div className="flex flex-wrap gap-3">
@@ -423,21 +425,21 @@ const SettingPage = () => {
               const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
               showConfirmModal(
                 'backup',
-                `現在の観察銘柄（${favoritesCount}銘柄）と\nメモ（${memoCount}件）をメールで送信します。\nよろしいですか？`,
+                `現在の観察銘柄（${favoritesCount}銘柄）と\n検討銘柄（${consideringCount}銘柄）と\nメモ（${memoCount}件）をメールで送信します。\nよろしいですか？`,
                 handleBackupFavorites
               );
             }}
             disabled={(() => {
               const allMemos = getAllMemos();
               const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
-              return emailStatus === 'sending' || (favoritesCount === 0 && memoCount === 0);
+              return emailStatus === 'sending' || (favoritesCount === 0 && consideringCount === 0 && memoCount === 0);
             })()}
             className={`font-bold py-2 px-4 rounded ${emailStatus === 'sending'
                 ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
                 : (() => {
                   const allMemos = getAllMemos();
                   const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
-                  return (favoritesCount === 0 && memoCount === 0)
+                  return (favoritesCount === 0 && consideringCount === 0 && memoCount === 0)
                     ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
                     : 'bg-green-500 hover:bg-green-700 text-white';
                 })()
@@ -449,9 +451,9 @@ const SettingPage = () => {
         {(() => {
           const allMemos = getAllMemos();
           const memoCount = Object.values(allMemos).filter(memo => memo.trim().length > 0).length;
-          return favoritesCount === 0 && memoCount === 0 && (
+          return favoritesCount === 0 && consideringCount === 0 && memoCount === 0 && (
             <p className="text-red-500 text-sm mt-2">
-              バックアップする観察銘柄もメモもありません
+              バックアップする観察銘柄・検討銘柄・メモがありません
             </p>
           );
         })()}
