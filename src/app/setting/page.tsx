@@ -349,6 +349,7 @@ const SettingPage = () => {
         <p>※毎年8月末に最新のJPX400銘柄リストを更新してください。（<a href="https://www.torezista.com/tool/jpx400/" target='_blank' className='text-blue-500 underline'>ダウンロードリンク</a>）</p>
         <h2 className='mt-6 font-bold text-lg'>更新履歴</h2>
         <ul>
+          <li>2025.12.10 - 検討銘柄新設</li>
           <li>2025.12.6 - ページネーション改修</li>
           <li>2025.11.29 - 3141上場廃止</li>
           <li>2025.09.18 - 株価データがnullの場合のスキップ表示を実装</li>

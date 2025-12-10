@@ -6,11 +6,41 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ChartCandlestick, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  // 現在のページかどうかを判定（個別ページも含む）
+  const isCurrentPage = (href: string): boolean => {
+    if (href === '/') {
+      // トップページは完全一致または/stock/で始まる場合
+      return pathname === '/' || pathname.startsWith('/stock/');
+    }
+    // その他は前方一致
+    return pathname.startsWith(href.replace(/\/$/, ''));
+  };
+
+  // ナビゲーションリンクのスタイルを取得（PC用）
+  const getNavLinkClass = (href: string): string => {
+    const baseClass = 'transition-colors';
+    if (isCurrentPage(href)) {
+      return `${baseClass} text-blue-600`;
+    }
+    return `${baseClass} text-gray-600 hover:text-blue-400`;
+  };
+
+  // ナビゲーションリンクのスタイルを取得（スマホ用）
+  const getMobileNavLinkClass = (href: string): string => {
+    const baseClass = 'block px-6 py-3 transition-colors border-b border-gray-100';
+    if (isCurrentPage(href)) {
+      return `${baseClass} text-blue-600 font-bold bg-blue-50`;
+    }
+    return `${baseClass} text-gray-600 hover:bg-gray-50 hover:text-blue-400`;
+  };
 
   // メニューの開閉を切り替え
   const toggleMenu = () => {
@@ -37,12 +67,13 @@ const Header = () => {
           {/* 右側（PC用ナビゲーション） */}
           <nav className="hidden md:flex items-center space-x-5">
             <a href="https://site3.sbisec.co.jp/ETGate/?_ControlID=WPLETmgR001Control&_PageID=WPLETmgR001Mdtl20&_DataStoreID=DSWPLETmgR001Control&_ActionID=DefaultAID&burl=iris_indexDetail&cat1=market&cat2=index&dir=tl1-idxdtl%7Ctl2-.N225%7Ctl5-jpn&file=index.html&getFlg=on" target='_blank'>日経平均</a>
-            <Link href="/" className="text-gray-600 hover:text-blue-400">JPX400一覧</Link>
-            <Link href="/turn_back/" className="text-gray-600 hover:text-blue-400">ターンバック</Link>
-            <Link href="/cross_v/" className="text-gray-600 hover:text-blue-400">クロスV</Link>
-            <Link href="/favorites/" className="text-gray-600 hover:text-blue-400">観察銘柄</Link>
-            <Link href="/holdings/" className="text-gray-600 hover:text-blue-400">保有銘柄</Link>
-            <Link href="/setting/" className="text-gray-600 hover:text-blue-400">設定</Link>
+            <Link href="/" className={getNavLinkClass('/')}>JPX400一覧</Link>
+            <Link href="/turn_back/" className={getNavLinkClass('/turn_back/')}>ターンバック</Link>
+            <Link href="/cross_v/" className={getNavLinkClass('/cross_v/')}>クロスV</Link>
+            <Link href="/favorites/" className={getNavLinkClass('/favorites/')}>観察銘柄</Link>
+            <Link href="/considering/" className={getNavLinkClass('/considering/')}>検討銘柄</Link>
+            <Link href="/holdings/" className={getNavLinkClass('/holdings/')}>保有銘柄</Link>
+            <Link href="/setting/" className={getNavLinkClass('/setting/')}>設定</Link>
           </nav>
 
           {/* ハンバーガーメニューボタン（スマホ用） */}
@@ -68,42 +99,49 @@ const Header = () => {
           <nav className="py-4">
             <Link
               href="/"
-              className="block px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-blue-400 transition-colors border-b border-gray-100"
+              className={getMobileNavLinkClass('/')}
               onClick={closeMenu}
             >
               JPX400一覧
             </Link>
             <Link
               href="/turn_back/"
-              className="block px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-blue-400 transition-colors border-b border-gray-100"
+              className={getMobileNavLinkClass('/turn_back/')}
               onClick={closeMenu}
             >
               ターンバック
             </Link>
             <Link
               href="/cross_v/"
-              className="block px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-blue-400 transition-colors border-b border-gray-100"
+              className={getMobileNavLinkClass('/cross_v/')}
               onClick={closeMenu}
             >
               クロスV
             </Link>
             <Link
               href="/favorites/"
-              className="block px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-blue-400 transition-colors border-b border-gray-100"
+              className={getMobileNavLinkClass('/favorites/')}
               onClick={closeMenu}
             >
               観察銘柄
             </Link>
             <Link
+              href="/considering/"
+              className={getMobileNavLinkClass('/considering/')}
+              onClick={closeMenu}
+            >
+              検討銘柄
+            </Link>
+            <Link
               href="/holdings/"
-              className="block px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-blue-400 transition-colors border-b border-gray-100"
+              className={getMobileNavLinkClass('/holdings/')}
               onClick={closeMenu}
             >
               保有銘柄
             </Link>
             <Link
               href="/setting/"
-              className="block px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-blue-400 transition-colors border-b border-gray-100"
+              className={getMobileNavLinkClass('/setting/')}
               onClick={closeMenu}
             >
               設定

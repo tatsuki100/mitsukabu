@@ -6,14 +6,15 @@
 
 import { StoredStock } from '@/types/stockData';
 import StockChart from './StockChart';
+import StockStatusButton from './StockStatusButton';
 import { useStockDataStorage } from '@/hooks/useStockDataStorage';
 import { useStockMemo } from '@/hooks/useStockMemo';
 import Link from 'next/link';
-import { ExternalLink, Star, Wallet } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 // リンクプレフィックスの型定義
-type LinkPrefix = 'stock' | 'favorites' | 'holdings' | 'turn_back' | 'cross_v';
+type LinkPrefix = 'stock' | 'favorites' | 'holdings' | 'considering' | 'turn_back' | 'cross_v';
 
 // Propsの型定義
 interface StockCardProps {
@@ -23,7 +24,7 @@ interface StockCardProps {
 
 const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
   // localStorage管理
-  const { getStoredStock, isFavorite, toggleFavorite, isHolding, toggleHolding } = useStockDataStorage();
+  const { getStoredStock } = useStockDataStorage();
 
   // メモ管理
   const { getMemo, saveMemo } = useStockMemo();
@@ -106,20 +107,6 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
     return null;
   };
 
-  // お気に入りボタンのクリックハンドラー
-  const handleFavoriteClick = (e: React.MouseEvent) => {
-    e.preventDefault(); // Linkのナビゲーションを防ぐ
-    e.stopPropagation(); // イベントの伝播を停止
-    toggleFavorite(stock.code);
-  };
-
-  // 保有銘柄ボタンのクリックハンドラー
-  const handleHoldingClick = (e: React.MouseEvent) => {
-    e.preventDefault(); // Linkのナビゲーションを防ぐ
-    e.stopPropagation(); // イベントの伝播を停止
-    toggleHolding(stock.code);
-  };
-
   // メモの変更ハンドラー（リアルタイム保存）
   const handleMemoChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value;
@@ -163,12 +150,6 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
     }
   };
 
-  // お気に入り状態を取得
-  const isStockFavorite = isFavorite(stock.code);
-
-  // 保有銘柄状態を取得
-  const isStockHolding = isHolding(stock.code);
-
   // メモがあるかどうかを判定（空文字や空白のみの場合は「メモなし」と判定）
   const hasMemo = memoText.trim().length > 0;
 
@@ -210,30 +191,9 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
   return (
     <div className={`bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow relative ${getCardBorderClass()}`}>
 
-      <div className="flex gap-2 absolute top-3 right-3 z-10">
-        {/* お気に入りボタン */}
-        <button
-          onClick={handleFavoriteClick}
-          className={`p-2 rounded-full transition-colors ${isStockFavorite
-            ? 'text-yellow-400 hover:text-yellow-600 bg-yellow-50 hover:bg-yellow-100'
-            : 'text-gray-400 hover:text-yellow-500 bg-gray-50 hover:bg-yellow-50'
-            }`}
-          title={isStockFavorite ? 'お気に入りから削除' : 'お気に入りに追加'}
-        >
-          <Star className={`w-5 h-5 ${isStockFavorite ? 'fill-current' : ''}`} />
-        </button>
-
-        {/* 保有銘柄ボタン */}
-        <button
-          onClick={handleHoldingClick}
-          className={`p-2 rounded-full transition-colors ${isStockHolding
-            ? 'text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100'
-            : 'text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50'
-            }`}
-          title={isStockHolding ? '保有銘柄から削除' : '保有銘柄に追加'}
-        >
-          <Wallet className={`w-5 h-5 ${isStockHolding ? 'fill-current' : ''}`} />
-        </button>
+      {/* 銘柄ステータスボタン */}
+      <div className="absolute top-3 right-3 z-10">
+        <StockStatusButton stockCode={stock.code} />
       </div>
 
       <Link
@@ -241,7 +201,7 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
         className="block"
       >
         {/* ヘッダー Start */}
-        <div className="border-b pb-2 mb-3 pr-24"> {/* 右側にお気に入りボタンの余白を確保 */}
+        <div className="border-b pb-2 mb-3 pr-14"> {/* 右側にステータスボタンの余白を確保 */}
           <div className="text-lg font-bold overflow-hidden whitespace-nowrap text-ellipsis">
             {stock.code} - {stock.name}
           </div>

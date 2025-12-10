@@ -42,6 +42,13 @@ type HoldingsData = {
   version: string;
 };
 
+// 検討銘柄管理用の型
+type ConsideringData = {
+  considering: string[]; // 銘柄コードの配列
+  lastUpdate: string;
+  version: string;
+};
+
 // Hookの戻り値型
 type UseStockDataStorageReturn = {
   // データ読み込み
@@ -88,6 +95,19 @@ type UseStockDataStorageReturn = {
   toggleHolding: (stockCode: string) => void;
   getHoldingStocks: () => StoredStock[];
   holdingsCount: number;
+
+  // 検討銘柄機能
+  considering: string[];
+  addConsidering: (stockCode: string) => void;
+  removeConsidering: (stockCode: string) => void;
+  isConsidering: (stockCode: string) => boolean;
+  toggleConsidering: (stockCode: string) => void;
+  getConsideringStocks: () => StoredStock[];
+  consideringCount: number;
+
+  // 銘柄ステータス統合機能（排他制御付き）
+  getStockStatus: (stockCode: string) => 'none' | 'watching' | 'considering' | 'holding';
+  setStockStatus: (stockCode: string, status: 'none' | 'watching' | 'considering' | 'holding') => void;
 };
 
 // localStorage keys
@@ -95,12 +115,14 @@ const STORAGE_KEYS = {
   STOCK_DATA: 'jpx400_stock_data_v1',
   FAVORITES: 'jpx400_favorites_v1',
   HOLDINGS: 'jpx400_holdings_v1',
+  CONSIDERING: 'jpx400_considering_v1',
 } as const;
 
 // データバージョン（null関連実装対応版）
 const DATA_VERSION = '1.2.0';
 const FAVORITES_VERSION = '1.0.0';
 const HOLDINGS_VERSION = '1.0.0';
+const CONSIDERING_VERSION = '1.0.0';
 
 // 自動圧縮するサイズ（4.7MBを超えると自動圧縮する）
 const COMPRESSION_THRESHOLD = 4.7 * 1024 * 1024;
@@ -109,6 +131,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
   const [storedData, setStoredData] = useState<StoredStockData | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [holdings, setHoldings] = useState<string[]>([]);
+  const [considering, setConsidering] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -208,6 +231,7 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     loadStoredData();
     loadFavorites();
     loadHoldings();
+    loadConsidering();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -364,6 +388,43 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     }
   };
 
+  // 検討銘柄データを読み込み（SSR対応）
+  const loadConsidering = () => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    try {
+      const rawConsidering = localStorage.getItem(STORAGE_KEYS.CONSIDERING);
+
+      if (!rawConsidering) {
+        console.log('📭 localStorage: 検討銘柄データが見つかりません');
+        setConsidering([]);
+        return;
+      }
+
+      const parsedConsidering: ConsideringData = JSON.parse(rawConsidering);
+
+      // バージョンチェック
+      if (parsedConsidering.version !== CONSIDERING_VERSION) {
+        console.warn(`⚠️ 検討銘柄データのバージョンが古いため削除: ${parsedConsidering.version} → ${CONSIDERING_VERSION}`);
+        localStorage.removeItem(STORAGE_KEYS.CONSIDERING);
+        setConsidering([]);
+        return;
+      }
+
+      console.log(`✅ localStorage: ${parsedConsidering.considering.length}件の検討銘柄を読み込み`);
+      setConsidering(parsedConsidering.considering);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
+      console.error('❌ 検討銘柄読み込みエラー:', errorMessage);
+      setConsidering([]);
+
+      // 破損データを削除
+      localStorage.removeItem(STORAGE_KEYS.CONSIDERING);
+    }
+  };
+
   // お気に入りデータを保存（SSR対応）
   const saveFavorites = (newFavorites: string[]) => {
     // サーバーサイドでは何もしない
@@ -411,6 +472,31 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
       const errorMessage = err instanceof Error ? err.message : '不明なエラー';
       console.error('❌ 保有銘柄保存エラー:', errorMessage);
       setError(`保有銘柄保存エラー: ${errorMessage}`);
+    }
+  };
+
+  // 検討銘柄データを保存（SSR対応）
+  const saveConsidering = (newConsidering: string[]) => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    try {
+      const dataToSave: ConsideringData = {
+        considering: newConsidering,
+        lastUpdate: new Date().toISOString(),
+        version: CONSIDERING_VERSION
+      };
+
+      const jsonData = JSON.stringify(dataToSave);
+      localStorage.setItem(STORAGE_KEYS.CONSIDERING, jsonData);
+      setConsidering(newConsidering);
+
+      console.log(`✅ 検討銘柄保存完了: ${newConsidering.length}件`);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
+      console.error('❌ 検討銘柄保存エラー:', errorMessage);
+      setError(`検討銘柄保存エラー: ${errorMessage}`);
     }
   };
 
@@ -704,6 +790,127 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     return storedData.stocks.filter(stock => holdings.includes(stock.code));
   };
 
+  // 検討銘柄追加（SSR対応）
+  const addConsidering = (stockCode: string) => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    // localStorage から最新の検討銘柄データを直接読み込む
+    let currentConsidering: string[] = [];
+
+    try {
+      const rawConsidering = localStorage.getItem(STORAGE_KEYS.CONSIDERING);
+      if (rawConsidering) {
+        const parsedConsidering: ConsideringData = JSON.parse(rawConsidering);
+        if (parsedConsidering.version === CONSIDERING_VERSION) {
+          currentConsidering = parsedConsidering.considering;
+        }
+      }
+    } catch (err) {
+      console.error('❌ 検討銘柄読み込みエラー:', err);
+      currentConsidering = [];
+    }
+
+    // 既に登録済みかチェック
+    if (currentConsidering.includes(stockCode)) {
+      console.log(`⚠️ ${stockCode} は既に検討銘柄に登録済みです`);
+      return;
+    }
+
+    // 新しい検討銘柄リストを作成
+    const newConsidering = [...currentConsidering, stockCode];
+    saveConsidering(newConsidering);
+    console.log(`🔍 ${stockCode} を検討銘柄に追加しました`);
+  };
+
+  // 検討銘柄削除（SSR対応）
+  const removeConsidering = (stockCode: string) => {
+    // サーバーサイドでは何もしない
+    if (typeof window === 'undefined') return;
+
+    // localStorage から最新の検討銘柄データを直接読み込む
+    let currentConsidering: string[] = [];
+
+    try {
+      const rawConsidering = localStorage.getItem(STORAGE_KEYS.CONSIDERING);
+      if (rawConsidering) {
+        const parsedConsidering: ConsideringData = JSON.parse(rawConsidering);
+        if (parsedConsidering.version === CONSIDERING_VERSION) {
+          currentConsidering = parsedConsidering.considering;
+        }
+      }
+    } catch (err) {
+      console.error('❌ 検討銘柄読み込みエラー:', err);
+      currentConsidering = [];
+    }
+
+    // 検討銘柄から削除
+    const newConsidering = currentConsidering.filter(code => code !== stockCode);
+    saveConsidering(newConsidering);
+    console.log(`🗑️ ${stockCode} を検討銘柄から削除しました`);
+  };
+
+  // 検討銘柄状態チェック
+  const isConsidering = (stockCode: string): boolean => {
+    return considering.includes(stockCode);
+  };
+
+  // 検討銘柄のトグル（追加/削除の切り替え）
+  const toggleConsidering = (stockCode: string) => {
+    if (isConsidering(stockCode)) {
+      removeConsidering(stockCode);
+    } else {
+      addConsidering(stockCode);
+    }
+  };
+
+  // 検討銘柄のデータを取得（銘柄コード昇順）
+  const getConsideringStocks = (): StoredStock[] => {
+    if (!storedData) return [];
+
+    // 検討銘柄のデータを取得
+    const consideringStocks = storedData.stocks.filter(stock => considering.includes(stock.code));
+
+    // 銘柄コード（数値）で昇順ソート
+    return consideringStocks.sort((a, b) => {
+      const codeA = parseInt(a.code, 10);
+      const codeB = parseInt(b.code, 10);
+      return codeA - codeB;
+    });
+  };
+
+  // 銘柄ステータス取得（排他制御付き統合機能）
+  const getStockStatus = (stockCode: string): 'none' | 'watching' | 'considering' | 'holding' => {
+    if (favorites.includes(stockCode)) return 'watching';
+    if (considering.includes(stockCode)) return 'considering';
+    if (holdings.includes(stockCode)) return 'holding';
+    return 'none';
+  };
+
+  // 銘柄ステータス設定（排他制御付き統合機能）
+  const setStockStatus = (stockCode: string, status: 'none' | 'watching' | 'considering' | 'holding') => {
+    // まず全てのリストから削除
+    removeFavorite(stockCode);
+    removeConsidering(stockCode);
+    removeHolding(stockCode);
+
+    // 新しいステータスを設定
+    switch (status) {
+      case 'watching':
+        addFavorite(stockCode);
+        break;
+      case 'considering':
+        addConsidering(stockCode);
+        break;
+      case 'holding':
+        addHolding(stockCode);
+        break;
+      case 'none':
+        // 何もしない（既に全て削除済み）
+        break;
+    }
+  };
+
   // データの存在確認
   const isDataAvailable = storedData !== null && storedData.stocks.length > 0;
 
@@ -730,11 +937,13 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
       const stockData = localStorage.getItem(STORAGE_KEYS.STOCK_DATA);
       const favoritesData = localStorage.getItem(STORAGE_KEYS.FAVORITES);
       const holdingsData = localStorage.getItem(STORAGE_KEYS.HOLDINGS);
+      const consideringData = localStorage.getItem(STORAGE_KEYS.CONSIDERING);
 
       const stockDataSize = stockData ? stockData.length : 0;
       const favoritesDataSize = favoritesData ? favoritesData.length : 0;
       const holdingsDataSize = holdingsData ? holdingsData.length : 0;
-      const totalSize = stockDataSize + favoritesDataSize + holdingsDataSize;
+      const consideringDataSize = consideringData ? consideringData.length : 0;
+      const totalSize = stockDataSize + favoritesDataSize + holdingsDataSize + consideringDataSize;
 
       const sizeInMB = (totalSize / 1024 / 1024).toFixed(2);
 
@@ -779,6 +988,19 @@ export const useStockDataStorage = (): UseStockDataStorageReturn => {
     isHolding,
     toggleHolding,
     getHoldingStocks,
-    holdingsCount: holdings.length
+    holdingsCount: holdings.length,
+
+    // 検討銘柄機能
+    considering,
+    addConsidering,
+    removeConsidering,
+    isConsidering,
+    toggleConsidering,
+    getConsideringStocks,
+    consideringCount: considering.length,
+
+    // 銘柄ステータス統合機能（排他制御付き）
+    getStockStatus,
+    setStockStatus
   };
 };
