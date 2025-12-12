@@ -135,7 +135,7 @@ Step 4: 既存機能が消えていないか確認する
 - テクニカル指標による株価スクリーニング（移動平均線、RSI、MACD）
 - ターンバックパターン検出（ローソク足が移動平均線を突き抜ける）
 - クロスVパターン検出（短期移動平均線が中長期移動平均線の下にある）
-- お気に入り・保有銘柄管理（localStorage使用）
+- 銘柄ステータス管理：観察銘柄・検討銘柄・保有銘柄（localStorage使用、排他制御）
 - 銘柄ごとのメモ機能（500文字まで）
 - 検索機能（銘柄コード・銘柄名）- 全ページで利用可能
 - ページネーション（32件/ページ、キーボード操作対応）
@@ -191,6 +191,9 @@ mitsukabu/
 │   │   ├── holdings/        # 保有銘柄ページ
 │   │   │   ├── page.tsx
 │   │   │   └── [code]/
+│   │   ├── considering/     # 検討銘柄ページ
+│   │   │   ├── page.tsx
+│   │   │   └── [code]/
 │   │   ├── turn_back/       # ターンバック銘柄ページ
 │   │   │   ├── page.tsx
 │   │   │   └── [code]/
@@ -210,7 +213,8 @@ mitsukabu/
 │   │   ├── StockChart.tsx   # ローソク足チャート（ECharts）
 │   │   ├── StockDetailPage.tsx  # 個別銘柄詳細（共通）
 │   │   ├── Pagination.tsx   # ページネーションUIコンポーネント
-│   │   └── SearchBox.tsx    # 検索ボックスコンポーネント
+│   │   ├── SearchBox.tsx    # 検索ボックスコンポーネント
+│   │   └── StockStatusButton.tsx  # 銘柄ステータス選択ボタン（ロータリー式）
 │   │
 │   ├── hooks/               # カスタムフック
 │   │   ├── useJPX400Stocks.ts      # JPX400銘柄リスト取得
@@ -259,8 +263,9 @@ mitsukabu/
 ### 3. localStorage管理
 - **保存キー**:
   - `jpx400_stock_data_v1`: 株価データ（バージョン1.2.0）
-  - `jpx400_favorites_v1`: お気に入り（バージョン1.0.0）
+  - `jpx400_favorites_v1`: 観察銘柄（バージョン1.0.0）
   - `jpx400_holdings_v1`: 保有銘柄（バージョン1.0.0）
+  - `jpx400_considering_v1`: 検討銘柄（バージョン1.0.0）
   - `jpx400_stock_memos_v1`: メモ
 - **圧縮**: 4.7MB超過時にpako（gzip）で自動圧縮
 - **バージョン管理**: 互換性のないデータは自動削除
@@ -272,15 +277,18 @@ mitsukabu/
 | クロスV | 5日線が25日線または75日線を下回る |
 
 ### 5. ユーザー機能
-- **お気に入り**: 観察したい銘柄を登録
-- **保有銘柄**: 実際に保有している銘柄を登録
+- **銘柄ステータス**: ロータリー式ボタンで3つのステータスを切り替え（排他制御：1銘柄につき1つのみ）
+  - **観察銘柄**: 長期的に観察したい銘柄
+  - **検討銘柄**: 短期的に購入を検討中の銘柄（「明日買おうかな」）
+  - **保有銘柄**: 実際に保有している銘柄
 - **メモ**: 銘柄ごとに500文字までのメモを保存
 - **検索**: 銘柄コード・銘柄名で検索（全ページで利用可能）
 - **ページネーション**: 32件/ページで表示、省略表示対応（1 ... 3 4 5 ... 10）
 - **キーボード操作**: ←→Home Endキーでページ切り替え
 
 ### 6. バックアップ
-- **EmailJS**: メモデータをメール送信でバックアップ可能
+- **EmailJS**: 観察銘柄・検討銘柄・メモをメール送信でバックアップ可能
+- 検討銘柄はメモ付きで送信される
 
 ---
 
@@ -318,12 +326,12 @@ npm run lint             # ESLint実行
 
 | Hook | ファイル | 役割 |
 |------|----------|------|
-| `useStockDataStorage` | `/src/hooks/useStockDataStorage.ts` | localStorage管理。自動圧縮、バージョン管理、nullデータ警告。お気に入り・保有銘柄の永続化 |
+| `useStockDataStorage` | `/src/hooks/useStockDataStorage.ts` | localStorage管理。自動圧縮、バージョン管理、nullデータ警告。観察・検討・保有銘柄の永続化。`getStockStatus`/`setStockStatus`で排他制御 |
 | `useYahooFinanceAPI` | `/src/hooks/useYahooFinanceAPI.ts` | Yahoo Finance APIから株価データ取得、DailyData形式に変換 |
 | `useJPX400Stocks` | `/src/hooks/useJPX400Stocks.ts` | CSVからJPX400銘柄リスト読み込み。開発10銘柄、本番400銘柄 |
 | `useStockScreening` | `/src/hooks/useStockScreening.ts` | テクニカル分析（ターンバック・クロスV判定） |
 | `useStockMemo` | `/src/hooks/useStockMemo.ts` | 銘柄ごとのメモ管理 |
-| `useEmailBackup` | `/src/hooks/useEmailBackup.ts` | EmailJSでlocalStorageデータをメール送信 |
+| `useEmailBackup` | `/src/hooks/useEmailBackup.ts` | EmailJSで観察銘柄・検討銘柄・メモをメール送信 |
 | `usePagination` | `/src/hooks/usePagination.ts` | ページネーション機能。ページ状態管理、キーボード操作、ページ番号生成 |
 
 ### ページネーション機能
@@ -345,6 +353,7 @@ npm run lint             # ESLint実行
 **使用箇所**:
 - 全銘柄一覧（`StockList.tsx`）
 - 観察銘柄（`favorites/page.tsx`）
+- 検討銘柄（`considering/page.tsx`）
 - 保有銘柄（`holdings/page.tsx`）
 - ターンバック銘柄（`turn_back/page.tsx`）
 - クロスV銘柄（`cross_v/page.tsx`）
@@ -360,6 +369,7 @@ npm run lint             # ESLint実行
 | `Header` | `/src/components/Header.tsx` | ナビゲーションヘッダー。銘柄数バッジ表示 |
 | `Pagination` | `/src/components/Pagination.tsx` | ページネーションUIコンポーネント。前後移動・ページ番号表示 |
 | `SearchBox` | `/src/components/SearchBox.tsx` | 検索入力コンポーネント。銘柄コード・銘柄名で検索 |
+| `StockStatusButton` | `/src/components/StockStatusButton.tsx` | 銘柄ステータス選択ボタン。ロータリー式で観察→検討→保有→なしと切り替え |
 
 ### ルート構成
 
@@ -370,6 +380,8 @@ npm run lint             # ESLint実行
 /favorites/[code]           # お気に入り銘柄詳細
 /holdings                   # 保有銘柄一覧
 /holdings/[code]            # 保有銘柄詳細
+/considering                # 検討銘柄一覧
+/considering/[code]         # 検討銘柄詳細
 /turn_back                  # ターンバックパターンスクリーニング結果
 /turn_back/[code]           # ターンバック銘柄詳細
 /cross_v                    # クロスVパターンスクリーニング結果
@@ -471,8 +483,9 @@ type StoredStockData = {
 | キー名 | 用途 | バージョン |
 |--------|------|-----------|
 | `jpx400_stock_data_v1` | 株価データ（圧縮対応） | 1.2.0 |
-| `jpx400_favorites_v1` | お気に入り銘柄コード | 1.0.0 |
+| `jpx400_favorites_v1` | 観察銘柄コード | 1.0.0 |
 | `jpx400_holdings_v1` | 保有銘柄コード | 1.0.0 |
+| `jpx400_considering_v1` | 検討銘柄コード | 1.0.0 |
 | `jpx400_stock_memos_v1` | 銘柄メモ | - |
 
 ---
@@ -549,4 +562,4 @@ type StoredStockData = {
 
 *このファイルはプロジェクトルートに配置してください。*
 
-*最終更新: 2025年12月6日*
+*最終更新: 2025年12月10日*
