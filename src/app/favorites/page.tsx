@@ -15,6 +15,8 @@ import FloatingPageNav from '@/components/FloatingPageNav';
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import { Star } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
+import AuthRequiredPage from '@/components/AuthRequiredPage';
 
 // ローディングコンポーネント
 const FavoritesLoading = () => (
@@ -232,8 +234,14 @@ const FavoritesContent = () => {
   );
 };
 
-// Suspenseでラップしたページコンポーネント
+// Suspenseでラップしたページコンポーネント（認証チェック付き）
 const FavoritesPage = () => {
+  const user = useAuth();
+
+  if (!user) {
+    return <AuthRequiredPage pageName="観察銘柄" />;
+  }
+
   return (
     <Suspense fallback={<FavoritesLoading />}>
       <FavoritesContent />

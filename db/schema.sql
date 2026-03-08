@@ -22,6 +22,7 @@ CREATE TABLE users (
   id SERIAL PRIMARY KEY, --管理用ID（自動採番）
   user_name VARCHAR(255) UNIQUE NOT NULL, --ユーザー名
   password_hash VARCHAR(255) NOT NULL, --ハッシュ化されたパスワード
+  email VARCHAR(255) UNIQUE, --メールアドレス（パスワードリセット用、既存ユーザーはNULL許可）
   role VARCHAR(30) NOT NULL --"admin" or "user"
 );
 
@@ -38,6 +39,23 @@ CREATE TABLE stock_data (
   stock_name VARCHAR(255) NOT NULL, --銘柄名
   daily_data JSONB NOT NULL, --日足データの配列
   last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP --取得日（取得する度に上書き）
+);
+
+
+/* ------------------------------------------
+ * テーブル物理名: password_reset_tokens
+ * テーブル論理名: パスワードリセットトークン
+ * テーブルの役割: パスワードリセット用のトークンを管理するテーブル
+ * テーブル属性: 子テーブル
+ * ------------------------------------------ */
+CREATE TABLE password_reset_tokens (
+  id SERIAL PRIMARY KEY, --管理用ID（自動採番）
+  user_id INTEGER NOT NULL, --ユーザーID（外部キー）
+  token_hash VARCHAR(64) NOT NULL, --SHA-256ハッシュ化されたトークン
+  expires_at TIMESTAMP NOT NULL, --有効期限（作成から1時間）
+  used BOOLEAN DEFAULT FALSE, --使用済みフラグ
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, --作成日時
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE --外部キー制約
 );
 
 

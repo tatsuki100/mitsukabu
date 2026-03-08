@@ -1,22 +1,9 @@
-# 全ての検索エンジンロボットを完全ブロック
+# みつかぶ - JPX400株式スクリーニングツール
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /setting
 
-# 主要検索エンジンを個別指定でブロック
-User-agent: Googlebot
-Disallow: /
-
-User-agent: Bingbot
-Disallow: /
-
-User-agent: Slurp
-Disallow: /
-
-User-agent: DuckDuckBot
-Disallow: /
-
-User-agent: Baiduspider
-Disallow: /
-
-# サイトマップも非公開
-# Sitemap: (コメントアウト)
+Sitemap: https://www.mitsukabu.com/sitemap.xml

@@ -15,6 +15,8 @@ import FloatingPageNav from '@/components/FloatingPageNav';
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import { GraduationCap } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
+import AuthRequiredPage from '@/components/AuthRequiredPage';
 
 // ローディングコンポーネント
 const ConsideringLoading = () => (
@@ -232,8 +234,14 @@ const ConsideringContent = () => {
   );
 };
 
-// Suspenseでラップしたページコンポーネント
+// Suspenseでラップしたページコンポーネント（認証チェック付き）
 const ConsideringPage = () => {
+  const user = useAuth();
+
+  if (!user) {
+    return <AuthRequiredPage pageName="検討銘柄" />;
+  }
+
   return (
     <Suspense fallback={<ConsideringLoading />}>
       <ConsideringContent />

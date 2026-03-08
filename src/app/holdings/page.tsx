@@ -15,6 +15,8 @@ import FloatingPageNav from '@/components/FloatingPageNav';
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import { Wallet, Search } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
+import AuthRequiredPage from '@/components/AuthRequiredPage';
 
 // ローディングコンポーネント
 const HoldingsLoading = () => (
@@ -253,8 +255,14 @@ const HoldingsContent = () => {
   );
 };
 
-// Suspenseでラップしたページコンポーネント
+// Suspenseでラップしたページコンポーネント（認証チェック付き）
 const HoldingsPage = () => {
+  const user = useAuth();
+
+  if (!user) {
+    return <AuthRequiredPage pageName="保有銘柄" />;
+  }
+
   return (
     <Suspense fallback={<HoldingsLoading />}>
       <HoldingsContent />

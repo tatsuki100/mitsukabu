@@ -1,0 +1,21 @@
+{
+  "name": "mitsukabu-stock-updater",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --format=cjs",
+    "package": "npm run build && cp jpx400.csv dist/ && cd dist && zip -r function.zip index.js jpx400.csv",
+    "deploy": "echo 'dist/function.zip を AWSコンソール → Lambda → コードソースからアップロード'"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "papaparse": "^5.5.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "@types/papaparse": "^5.3.16"
+  }
+}

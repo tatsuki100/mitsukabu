@@ -6,12 +6,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useStockDataStorage } from '@/hooks/useStockDataStorage';
 import { useStockScreening } from '@/hooks/useStockScreening';
 import { CHART_PERIODS, StoredStock } from '@/types/stockData';
 import StockChart from './StockChart';
 import StockStatusButton from './StockStatusButton';
+import AuthRequiredModal from './AuthRequiredModal';
+import { useAuth } from '@/components/AuthProvider';
 import { ExternalLink } from 'lucide-react';
 
 // ナビゲーションモードの型定義
@@ -29,6 +31,8 @@ const StockDetailPage = ({
   // screeningCondition 
 }: StockDetailPageProps) => {
   const router = useRouter();
+  const user = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // localStorage管理
   const {
@@ -280,7 +284,10 @@ const StockDetailPage = ({
               </select>
 
               {/* 銘柄ステータスボタン */}
-              <StockStatusButton stockCode={stockCode} />
+              <StockStatusButton
+                stockCode={stockCode}
+                onAuthRequired={!user ? () => setShowAuthModal(true) : undefined}
+              />
 
             </div>
 
@@ -353,6 +360,12 @@ const StockDetailPage = ({
         </div>
         {/* チャート本体 End */}
       </div>
+
+      {/* 認証必要モーダル */}
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </div>
   );
 };

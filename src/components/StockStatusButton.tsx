@@ -16,9 +16,10 @@ const STATUS_ORDER: StockStatus[] = ['none', 'watching', 'considering', 'holding
 
 interface StockStatusButtonProps {
   stockCode: string;
+  onAuthRequired?: () => void;
 }
 
-const StockStatusButton = ({ stockCode }: StockStatusButtonProps) => {
+const StockStatusButton = ({ stockCode, onAuthRequired }: StockStatusButtonProps) => {
   const { getStockStatus, setStockStatus } = useStockDataStorage();
 
   const status = getStockStatus(stockCode);
@@ -69,6 +70,12 @@ const StockStatusButton = ({ stockCode }: StockStatusButtonProps) => {
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // 未ログイン時は認証モーダルを表示
+    if (onAuthRequired) {
+      onAuthRequired();
+      return;
+    }
 
     // 現在のステータスのインデックスを取得
     const currentIndex = STATUS_ORDER.indexOf(status);

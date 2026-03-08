@@ -12,6 +12,8 @@ import { useStockMemo } from '@/hooks/useStockMemo';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/components/AuthProvider';
+import AuthRequiredModal from '@/components/AuthRequiredModal';
 
 // リンクプレフィックスの型定義
 type LinkPrefix = 'stock' | 'favorites' | 'holdings' | 'considering' | 'turn_back' | 'cross_v';
@@ -23,6 +25,10 @@ interface StockCardProps {
 }
 
 const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
+  // 認証状態
+  const user = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
   // localStorage管理
   const { getStoredStock } = useStockDataStorage();
 
@@ -193,7 +199,10 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
 
       {/* 銘柄ステータスボタン */}
       <div className="absolute top-3 right-3 z-10">
-        <StockStatusButton stockCode={stock.code} />
+        <StockStatusButton
+          stockCode={stock.code}
+          onAuthRequired={!user ? () => setShowAuthModal(true) : undefined}
+        />
       </div>
 
       <Link
@@ -261,21 +270,35 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
       <div className="mt-4 border-t pt-3">
         <div className="mt-2">
           <textarea
-            value={memoText}
-            onChange={handleMemoChange}
+            value={user ? memoText : ''}
+            onChange={user ? handleMemoChange : undefined}
+            readOnly={!user}
             placeholder="売買メモ記入欄"
-            className={`w-full p-2 border rounded text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${getMemoBackgroundClass()}`}
+            className={`w-full p-2 border rounded text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${user ? getMemoBackgroundClass() : 'bg-white border-gray-300 cursor-pointer'}`}
             rows={3}
-            onClick={(e) => e.stopPropagation()} // テキストエリアクリック時にリンクが発火しないように
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!user) {
+                setShowAuthModal(true);
+              }
+            }}
+            onFocus={(e) => {
+              if (!user) {
+                e.target.blur();
+                setShowAuthModal(true);
+              }
+            }}
           />
-          <div className="flex justify-between items-center mt-1 text-xs text-gray-500">
-            <span>
-              {hasMemo ? '📝 メモ保存済み' : '自動保存されます'}
-            </span>
-            <span className={hasMemo ? 'text-blue-600 font-medium' : ''}>
-              {memoText.length}/500
-            </span>
-          </div>
+          {user && (
+            <div className="flex justify-between items-center mt-1 text-xs text-gray-500">
+              <span>
+                {hasMemo ? '📝 メモ保存済み' : '自動保存されます'}
+              </span>
+              <span className={hasMemo ? 'text-blue-600 font-medium' : ''}>
+                {memoText.length}/500
+              </span>
+            </div>
+          )}
         </div>
       </div>
       {/* メモ欄 End */}
@@ -312,6 +335,11 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
       </div>
       {/* 証券会社リンクボタン End */}
 
+      {/* 認証必要モーダル */}
+      <AuthRequiredModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </div>
   );
 };

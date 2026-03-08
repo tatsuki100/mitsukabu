@@ -7,12 +7,12 @@ import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import Header from '@/components/Header'
+import Footer from '@/components/Footer'
+import MainContent from '@/components/MainContent'
+import { AuthProvider } from '@/components/AuthProvider'
+import { getCurrentUser } from '@/lib/auth'
 
-// フッターを表示する場合はコメントアウト解除
-// import Footer from '@/components/Footer'
-
-// Googleアナリティクスを入れる場合はコメントアウト解除
-// import Script from 'next/script'
+import Script from 'next/script'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -21,7 +21,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "みつかぶ",
-  description: "JPX400銘柄のチャートを一覧で表示しています。会員登録不要。毎日17時ごろ株価データ更新。お気に入り機能もあり。【狙い目の株が見つかる。みつかぶ】",
+  description: "JPX400銘柄のチャートを一覧で表示しています。会員登録不要。毎日6時ごろ株価データ更新。お気に入り機能もあり。【狙い目の株が見つかる。みつかぶ】",
   // SEO用の追加メタデータ
   keywords: "株式投資, JPX400, スクリーニング, ローソク足チャート, 移動平均線, RSI, MACD, ターンバック, テクニカル分析, 株価チャート",
   authors: [{ name: "みつかぶ" }],
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   // OGP設定
   openGraph: {
     title: "みつかぶ - JPX400株式スクリーニングツール",
-    description: "JPX400銘柄をローソク足チャートで一覧表示。会員登録不要＆完全無料。株価データは毎日17時ごろ更新。【狙い目の株が見つかる。みつかぶ。】",
+    description: "JPX400銘柄をローソク足チャートで一覧表示。会員登録不要＆完全無料。株価データは毎日16時ごろ更新。【狙い目の株が見つかる。みつかぶ。】",
     type: "website",
     locale: "ja_JP",
     url: process.env.NEXT_PUBLIC_BASE_URL || "https://www.mitsukabu.com" || "https://mitsukabu.com",
@@ -73,18 +73,21 @@ export const metadata: Metadata = {
 }
 
 // Google Analytics の測定ID（環境変数から取得）
-// const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Server ComponentでJWT Cookie検証 → ユーザー情報取得
+  const user = await getCurrentUser();
+
   return (
     <html lang="ja">
       <head>
         {/* Google アナリティクスタグ Start */}
-        {/* {GA_MEASUREMENT_ID && (
+        {GA_MEASUREMENT_ID && (
           <>
             <Script
               src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
@@ -102,17 +105,19 @@ export default function RootLayout({
               `}
             </Script>
           </>
-        )} */}
+        )}
         {/* Google アナリティクスタグ End */}
       </head>
       <body className={inter.className}>
-        <div className="min-h-screen flex flex-col">
-          <Header />
-          <main className="pt-10 flex-1"> {/* ヘッダーの高さと同じ分の余白 */}
-            {children}
-          </main>
-          {/* <Footer /> */}
-        </div>
+        <AuthProvider user={user}>
+          <div className="min-h-screen flex flex-col">
+            <Header />
+            <MainContent>
+              {children}
+            </MainContent>
+            <Footer />
+          </div>
+        </AuthProvider>
       </body>
     </html>
   )

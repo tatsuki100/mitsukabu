@@ -1,9 +1,11 @@
 // ========================================
 // src/hooks/useStockMemo.ts
-// 銘柄ごとのメモ管理カスタムHook
+// 銘柄ごとのメモ管理カスタムHook（DB移行版）
+// 楽観的更新 + 500msデバウンスでAPI保存
 // ========================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { fetchUserData, invalidateUserDataCache } from '@/lib/userDataCache';
 
 // メモデータの型定義
 type StockMemos = {
@@ -19,27 +21,55 @@ type UseStockMemoReturn = {
   loading: boolean;
 };
 
-const STORAGE_KEY = 'jpx400_stock_memos_v1';
+// 旧localStorageキー（クリーンアップ用）
+const OLD_STORAGE_KEY = 'jpx400_stock_memos_v1';
+
+// デバウンス間隔（ms）
+const DEBOUNCE_MS = 500;
 
 export const useStockMemo = (): UseStockMemoReturn => {
   const [memos, setMemos] = useState<StockMemos>({});
   const [loading, setLoading] = useState<boolean>(true);
 
+  // デバウンスタイマー管理（銘柄コードごと）
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   // 初回読み込み
   useEffect(() => {
     loadMemos();
+    cleanupOldLocalStorage();
+
+    // クリーンアップ: 未送信のデバウンスタイマーをすべてキャンセル
+    return () => {
+      for (const timer of Object.values(debounceTimers.current)) {
+        clearTimeout(timer);
+      }
+    };
   }, []);
 
-  // localStorageからメモを読み込み
-  const loadMemos = () => {
+  // 旧localStorageデータのクリーンアップ
+  const cleanupOldLocalStorage = () => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      if (localStorage.getItem(OLD_STORAGE_KEY)) {
+        localStorage.removeItem(OLD_STORAGE_KEY);
+        console.log(`旧localStorage削除: ${OLD_STORAGE_KEY}（DB移行完了）`);
+      }
+    } catch {
+      // クリーンアップ失敗は無視
+    }
+  };
+
+  // APIからメモを読み込み
+  const loadMemos = async () => {
     try {
       setLoading(true);
-      const rawData = localStorage.getItem(STORAGE_KEY);
+      const userData = await fetchUserData();
 
-      if (rawData) {
-        const parsedMemos: StockMemos = JSON.parse(rawData);
-        setMemos(parsedMemos);
-        console.log(`メモ読み込み完了: ${Object.keys(parsedMemos).length}件`);
+      if (userData && userData.memos) {
+        setMemos(userData.memos);
+        console.log(`メモ読み込み完了: ${Object.keys(userData.memos).length}件`);
       } else {
         console.log('メモデータなし');
         setMemos({});
@@ -52,68 +82,95 @@ export const useStockMemo = (): UseStockMemoReturn => {
     }
   };
 
-  // localStorageにメモを保存
-  const saveToStorage = useCallback((newMemos: StockMemos) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newMemos));
-      console.log('メモ保存完了');
-    } catch (error) {
-      console.error('メモ保存エラー:', error);
-    }
-  }, []);
-
   // 特定銘柄のメモを取得
   const getMemo = useCallback((stockCode: string): string => {
     return memos[stockCode] || '';
   }, [memos]);
 
-  // メモを保存
+  // メモを保存（楽観的更新 + デバウンスAPI呼び出し）
   const saveMemo = useCallback((stockCode: string, memo: string) => {
-    // localStorage から最新のメモデータを直接読み込む
-    let currentMemos: StockMemos = {};
-
-    try {
-      const rawData = localStorage.getItem(STORAGE_KEY);
-      if (rawData) {
-        currentMemos = JSON.parse(rawData);
-      }
-    } catch (error) {
-      console.error('❌ メモ読み込みエラー:', error);
-      currentMemos = {};
-    }
-
-    // 最新のデータに新しいメモを追加
-    const newMemos = {
-      ...currentMemos,
-      [stockCode]: memo
-    };
-
-    // 空文字の場合は削除
+    // 楽観的更新: ローカルstateを即座に更新
     if (memo.trim() === '') {
-      delete newMemos[stockCode];
+      // 空文字の場合はローカルstateから削除
+      setMemos(prev => {
+        const newMemos = { ...prev };
+        delete newMemos[stockCode];
+        return newMemos;
+      });
+    } else {
+      setMemos(prev => ({
+        ...prev,
+        [stockCode]: memo,
+      }));
     }
 
-    // localStorage に保存
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newMemos));
-      console.log(`✅ メモ保存完了: ${stockCode}`);
-    } catch (error) {
-      console.error('❌ メモ保存エラー:', error);
+    // 既存のデバウンスタイマーをクリア
+    if (debounceTimers.current[stockCode]) {
+      clearTimeout(debounceTimers.current[stockCode]);
     }
 
-    // state も更新
-    setMemos(newMemos);
+    // デバウンスでAPI呼び出し
+    debounceTimers.current[stockCode] = setTimeout(() => {
+      delete debounceTimers.current[stockCode];
+
+      if (memo.trim() === '') {
+        // 空文字の場合はDBから削除
+        fetch(`/api/memos/${stockCode}`, {
+          method: 'DELETE',
+        })
+          .then(res => {
+            if (!res.ok) throw new Error(`API Error: ${res.status}`);
+            invalidateUserDataCache();
+          })
+          .catch(err => {
+            console.error('メモ削除APIエラー:', err);
+          });
+      } else {
+        // メモをDBに保存（UPSERT）
+        fetch(`/api/memos/${stockCode}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memo }),
+        })
+          .then(res => {
+            if (!res.ok) throw new Error(`API Error: ${res.status}`);
+            invalidateUserDataCache();
+          })
+          .catch(err => {
+            console.error('メモ保存APIエラー:', err);
+          });
+      }
+    }, DEBOUNCE_MS);
   }, []);
 
   // メモを削除
   const deleteMemo = useCallback((stockCode: string) => {
-    const newMemos = { ...memos };
-    delete newMemos[stockCode];
+    // 楽観的更新: ローカルstateから即座に削除
+    setMemos(prev => {
+      const newMemos = { ...prev };
+      delete newMemos[stockCode];
+      return newMemos;
+    });
 
-    setMemos(newMemos);
-    saveToStorage(newMemos);
-    console.log(`メモ削除: ${stockCode}`);
-  }, [memos, saveToStorage]);
+    // 既存のデバウンスタイマーをクリア
+    if (debounceTimers.current[stockCode]) {
+      clearTimeout(debounceTimers.current[stockCode]);
+      delete debounceTimers.current[stockCode];
+    }
+
+    // 即座にAPI呼び出し（デバウンスなし）
+    fetch(`/api/memos/${stockCode}`, {
+      method: 'DELETE',
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`API Error: ${res.status}`);
+        invalidateUserDataCache();
+        console.log(`メモ削除: ${stockCode}`);
+      })
+      .catch(err => {
+        console.error('メモ削除APIエラー:', err);
+      });
+  }, []);
 
   // 全メモを取得
   const getAllMemos = useCallback((): StockMemos => {

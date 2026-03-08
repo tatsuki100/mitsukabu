@@ -49,7 +49,7 @@ export const NullDataWarning: React.FC<NullDataWarningProps> = ({
             <p className="mb-2">
               <span className="font-medium">{nullDataSummary.totalStocksWithNullData}銘柄</span>で
               合計<span className="font-medium">{nullDataSummary.totalNullDays}日分</span>のデータが
-              Yahoo Finance APIから正常に取得できませんでした。
+              APIから正常に取得できませんでした。
             </p>
             <p className="mb-3">
               これらの日付はチャートから除外されています（祝日や土日のように非表示になります）。

@@ -7,7 +7,7 @@ export default function TermsOfService() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <h1 className="text-3xl font-bold my-8">利用規約</h1>
-      
+
       <div className="prose max-w-none">
         <p className="mb-6">
           本利用規約（以下「本規約」）は、みつかぶ（以下「当サービス」）の利用に関する条件を定めるものです。
@@ -22,8 +22,8 @@ export default function TermsOfService() {
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">第2条（利用登録）</h2>
         <p className="mb-4">
-          当サービスは登録不要かつ全て無料でご利用いただけます。
-          ただし、お気に入り機能や保有銘柄機能などの一部機能は、ブラウザのローカルストレージを使用します。
+          当サービスの利用にはユーザー登録が必要です。ユーザー名とパスワードを設定し、アカウントを作成してください。
+          お気に入り機能、保有銘柄機能、メモ機能などのユーザーデータはサーバー上のデータベースに保存されます。
         </p>
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">第3条（禁止事項）</h2>
@@ -46,7 +46,6 @@ export default function TermsOfService() {
           <li>当サービスにかかるコンピュータシステムの保守点検または更新を行う場合</li>
           <li>地震、落雷、火災、停電または天災などの不可抗力により、当サービスの提供が困難となった場合</li>
           <li>コンピュータまたは通信回線等が事故により停止した場合</li>
-          <li>Yahoo Finance API等の第三者サービスが停止または仕様変更された場合</li>
           <li>JPX400銘柄リストの取得ができなくなった場合</li>
           <li>その他、当サービス運営者が当サービスの提供が困難と判断した場合</li>
         </ul>
@@ -62,17 +61,13 @@ export default function TermsOfService() {
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">第6条（免責事項）</h2>
         <ul className="list-disc pl-6 mb-4">
-          <li>当サービスに表示される株価情報は、Yahoo Finance APIから取得したものであり、その正確性、完全性、最新性を保証するものではありません</li>
-          <li>Yahoo Finance APIは非公式なAPIであり、既にサポートが終了しているため、予告なくサービスが停止したり、不正確なデータが配信される可能性があります</li>
           <li>当サービスの利用により生じた投資判断の結果について、当サービス運営者は一切の責任を負いません</li>
           <li>当サービスの利用により生じた損害について、当サービス運営者は一切の責任を負いません</li>
           <li>当サービスは投資助言や投資勧誘を目的とするものではありません</li>
           <li>投資の判断は必ずご自身の責任で行い、当サービスの情報のみに依存した投資は避けてください</li>
           <li>移動平均線、RSI、MACD等のテクニカル指標は過去のデータに基づく計算値であり、将来の価格動向を保証するものではありません</li>
-          <li>「ターンバック」「クロスV」等のスクリーニング結果は、当サービス運営者が独自に考察した参考情報であり、投資成果を約束するものではありません</li>
           <li>当サービスの情報を元にした投資により損失が生じた場合でも、当サービス運営者は損害を補償いたしません</li>
           <li>株価データの配信遅延、データ欠損、システム障害により生じた損失について、当サービス運営者は一切の責任を負いません</li>
-          <li>第三者のAPIサービス（Yahoo Finance API等）の仕様変更や停止により当サービスが利用できなくなった場合でも、当サービス運営者は責任を負いません</li>
         </ul>
 
         <h2 className="text-2xl font-semibold mt-8 mb-4">第7条（サービス内容の変更等）</h2>
@@ -95,7 +90,7 @@ export default function TermsOfService() {
 
         <p className="mt-14 text-sm text-right text-gray-600">
           制定日：2025/7/29<br />
-          最終更新日：2025/8/1
+          最終更新日：2026/3/7
         </p>
       </div>
     </div>

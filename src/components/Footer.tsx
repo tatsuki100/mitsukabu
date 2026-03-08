@@ -16,9 +16,6 @@ const Footer = () => {
             <p className="text-sm text-gray-600">
               © {currentYear} みつかぶ. All rights reserved.
             </p>
-            <p className="text-xs text-gray-500 mt-1">
-              株価データはYahoo Finance APIを使用しています。
-            </p>
           </div>
           
           <div className="flex flex-wrap gap-4 text-sm">
