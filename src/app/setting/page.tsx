@@ -123,7 +123,7 @@ const SettingPage = () => {
       {/* ヘッダー */}
       <div className="bg-blue-50 border border-blue-200 p-4 rounded">
         <h1 className="text-2xl font-bold mb-1">株価データ設定</h1>
-        <p>株価データは毎日6時ごろ（月〜金）にLambda関数で自動更新されます。</p>
+        <p>株価データは毎日16時ごろ（月〜金曜日）にLambda関数で自動更新されます。</p>
         <p>※毎年8月末に最新のJPX400銘柄リストを更新してください。（<a href="https://www.torezista.com/tool/jpx400/" target='_blank' className='text-blue-500 underline'>ダウンロードリンク</a>）</p>
         <h2 className='mt-6 font-bold text-lg'>更新履歴</h2>
         <ul>
