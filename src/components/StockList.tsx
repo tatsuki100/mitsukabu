@@ -98,7 +98,7 @@ const StockList = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
           <h2 className="text-xl font-bold mb-2">株価データがありません</h2>
-          <p>通信環境を確認していただくか、以下から管理者にお問い合わせください。</p>
+          <p>通信環境を確認していただくか、改善されない場合は、以下から管理者にお問い合わせください。</p>
           <p><a href="https://forms.gle/iVTN7imV4KvjNCzr8" target="_blank" className="underline text-blue-500">https://forms.gle/iVTN7imV4KvjNCzr8</a></p>
         </div>
       </div>
