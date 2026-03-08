@@ -127,7 +127,7 @@ const SettingPage = () => {
         <p>※毎年8月末に最新のJPX400銘柄リストを更新してください。（<a href="https://www.torezista.com/tool/jpx400/" target='_blank' className='text-blue-500 underline'>ダウンロードリンク</a>）</p>
         <h2 className='mt-6 font-bold text-lg'>更新履歴</h2>
         <ul>
-          <li>2026.03.08 - 会員登録機能＆株価の時自動更新機能実装</li>
+          <li>2026.03.08 - 会員登録機能＆株価の自動更新機能実装</li>
           <li>2026.03.07 - データベース化に伴うバックアップメール廃止</li>
           <li>2025.12.10 - 検討銘柄新設＆バックアップメール改修</li>
           <li>2025.12.6 - ページネーション改修</li>
@@ -186,7 +186,7 @@ const SettingPage = () => {
             className={`font-bold py-2 px-4 rounded ${
               refreshStatus === 'sending'
                 ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
-                : 'bg-orange-500 hover:bg-orange-700 text-white'
+                : 'bg-red-500 hover:bg-red-700 text-white'
             }`}
           >
             {refreshStatus === 'sending' ? '更新開始中...' : '手動更新を実行'}
@@ -240,7 +240,7 @@ const SettingPage = () => {
                       <td className="py-2 pr-4">
                         <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
                           u.role === 'admin'
-                            ? 'bg-orange-100 text-orange-700'
+                            ? 'bg-red-100 text-red-700'
                             : 'bg-blue-100 text-blue-600'
                         }`}>
                           {u.role}
@@ -261,7 +261,7 @@ const SettingPage = () => {
                                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                 : u.role === 'admin'
                                   ? 'bg-blue-200 hover:bg-blue-300 text-blue-700'
-                                  : 'bg-orange-100 hover:bg-orange-200 text-orange-700'
+                                  : 'bg-red-100 hover:bg-red-200 text-red-700'
                             }`}
                           >
                             {changingRoleId === u.id
