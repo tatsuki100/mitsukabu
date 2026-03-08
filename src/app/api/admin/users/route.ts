@@ -13,7 +13,7 @@ type UserRow = {
   user_name: string;
   email: string | null;
   role: string;
-  created_at: string;
+  created_at: string | Date;
 };
 
 // admin権限チェック
@@ -45,7 +45,9 @@ export async function GET() {
       userName: row.user_name,
       email: row.email,
       role: row.role,
-      createdAt: new Date(row.created_at + '+00:00').toISOString(),
+      createdAt: row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : new Date(row.created_at + '+00:00').toISOString(),
     }));
 
     return NextResponse.json({ users });

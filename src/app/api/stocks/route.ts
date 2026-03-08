@@ -15,7 +15,14 @@ type StockDataRow = {
   stock_code: string;
   stock_name: string;
   daily_data: DailyData[];
-  last_update: string;
+  last_update: string | Date;
+};
+
+// last_updateをDateオブジェクトに安全に変換（文字列・Date両対応）
+const parseLastUpdate = (value: string | Date): Date => {
+  if (value instanceof Date) return value;
+  // タイムゾーンなし文字列の場合はUTCとして解釈
+  return new Date(value + '+00:00');
 };
 
 // DBの行からStoredStockを生成
@@ -31,7 +38,7 @@ const buildStoredStock = (row: StockDataRow): StoredStock => {
       highPrice: 0,
       lowPrice: 0,
       previousClosePrice: 0,
-      lastUpdated: new Date(row.last_update + '+00:00').toISOString().split('T')[0],
+      lastUpdated: parseLastUpdate(row.last_update).toISOString().split('T')[0],
     };
   }
 
@@ -70,7 +77,7 @@ const getAllStocks = async () => {
     stocks.push(stock);
     dailyDataMap[typedRow.stock_code] = typedRow.daily_data;
 
-    const lastUpdate = new Date(typedRow.last_update + '+00:00').toISOString();
+    const lastUpdate = parseLastUpdate(typedRow.last_update).toISOString();
     if (lastUpdate > latestUpdate) {
       latestUpdate = lastUpdate;
     }
