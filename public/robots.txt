@@ -4,6 +4,8 @@ Allow: /
 Disallow: /api/
 Disallow: /login
 Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
 Disallow: /setting
 
 Sitemap: https://www.mitsukabu.com/sitemap.xml
