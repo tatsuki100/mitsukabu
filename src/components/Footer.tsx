@@ -14,7 +14,7 @@ const Footer = () => {
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="mb-4 md:mb-0">
             <p className="text-sm text-gray-600">
-              © {currentYear} みつかぶ. All rights reserved.
+              © {currentYear} みつかぶ. All rights reserved. <br />
             </p>
           </div>
           
@@ -43,7 +43,8 @@ const Footer = () => {
         </div>
         
         <div className="mt-4 pt-4 border-t border-gray-200 text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 leading-normal">
+            毎平日16時ごろに株価更新。狙い目の株が見つかる、みつかぶ。<br />
             投資の判断は必ずご自身の責任で行ってください。当サービスは投資の結果について一切の責任を負いません。
           </p>
         </div>

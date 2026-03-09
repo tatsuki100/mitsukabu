@@ -1,7 +1,7 @@
 // ========================================
 // lambda/index.ts
 // Lambda関数エントリーポイント（handler）
-// EventBridgeから毎日6時(JST)にトリガーされる
+// EventBridgeから毎日16時(JST)にトリガーされる
 // ========================================
 
 import * as fs from 'fs';

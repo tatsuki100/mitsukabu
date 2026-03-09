@@ -75,8 +75,7 @@ const Header = () => {
           {/* 左側（ロゴ） */}
           <div className="text-lg font-bold">
             <Link href="/" className="flex items-center" onClick={closeMenu}>
-              <ChartCandlestick className="mr-1" />
-              みつかぶ<span className='text-xs ml-4 font-normal'>- 平日16時ごろに株価更新。狙い目の株が見つかる、みつかぶ。-</span>
+              <ChartCandlestick className="mr-1" />みつかぶ
             </Link>
           </div>
 
@@ -89,7 +88,7 @@ const Header = () => {
             <Link href="/favorites/" className={getNavLinkClass('/favorites/')}>観察銘柄</Link>
             <Link href="/considering/" className={getNavLinkClass('/considering/')}>検討銘柄</Link>
             <Link href="/holdings/" className={getNavLinkClass('/holdings/')}>保有銘柄</Link>
-            {isAdmin && <Link href="/setting/" className={getNavLinkClass('/setting/')}>設定</Link>}
+            {isAdmin && <Link href="/setting/" className={getNavLinkClass('/setting/')}>管理画面</Link>}
 
             {/* ユーザー情報 + ログアウト */}
             {user ? (
@@ -189,7 +188,7 @@ const Header = () => {
                 className={getMobileNavLinkClass('/setting/')}
                 onClick={closeMenu}
               >
-                設定
+                管理画面
               </Link>
             )}
 
