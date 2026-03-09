@@ -136,7 +136,7 @@ const HoldingsContent = () => {
         <div className="bg-gray-100 border border-gray-300 text-gray-700 px-6 py-8 rounded-lg text-center">
           <Wallet className="w-12 h-12 mx-auto mb-4 text-gray-400" />
           <h3 className="text-xl font-bold mb-2">保有銘柄がありません</h3>
-          <p className="mb-4">銘柄名の横にあるテータスボタンを押して、保有銘柄を追加してください。</p>
+          <p className="mb-4">銘柄名の横にあるステータスボタンを押して、保有銘柄を追加してください。</p>
           <button
             onClick={() => router.push('/')}
             className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
