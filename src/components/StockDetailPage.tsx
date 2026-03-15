@@ -15,6 +15,7 @@ import StockStatusButton from './StockStatusButton';
 import AuthRequiredModal from './AuthRequiredModal';
 import { useAuth } from '@/components/AuthProvider';
 import { ExternalLink } from 'lucide-react';
+import { StockLoading, StockError, StockNoData } from '@/components/StockStatusMessages';
 
 // ナビゲーションモードの型定義
 type NavigationMode = 'all' | 'favorites' | 'holdings' | 'considering' | 'turn_back' | 'cross_v';
@@ -159,41 +160,13 @@ const StockDetailPage = ({
   };
 
   // ローディング中
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
-          <h2 className="text-xl font-bold mb-2">📊 データ読み込み中...</h2>
-          <p>localStorageから株価データを読み込んでいます。</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <StockLoading />;
 
   // エラー時
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <h2 className="text-xl font-bold mb-2">❌ エラーが発生しました</h2>
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
+  if (error) return <StockError error={error} />;
 
   // データがない場合
-  if (!isDataAvailable) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-          <h2 className="text-xl font-bold mb-2">株価データがありません</h2>
-          <p>通信環境を確認していただくか、改善されない場合は、以下から管理者にお問い合わせください。</p>
-          <p><a href="https://forms.gle/iVTN7imV4KvjNCzr8" target="_blank" className="underline text-blue-500">https://forms.gle/iVTN7imV4KvjNCzr8</a></p>
-        </div>
-      </div>
-    );
-  }
+  if (!isDataAvailable) return <StockNoData />;
 
   // 該当銘柄が見つからない場合
   if (!currentStockData) {

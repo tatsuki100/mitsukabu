@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useStockDataStorage } from '@/hooks/useStockDataStorage';
 import { useAuth } from '@/components/AuthProvider';
+import { StockLoading } from '@/components/StockStatusMessages';
 
 // ユーザー一覧の型
 type UserItem = {
@@ -87,6 +88,7 @@ const SettingPage = () => {
 
   // 管理者用手動更新
   const handleManualRefresh = async () => {
+    if (!confirm('株価データの手動更新を実行しますか？')) return;
     setRefreshStatus('sending');
     setRefreshError(null);
 
@@ -107,16 +109,7 @@ const SettingPage = () => {
   };
 
   // データ読み込み中
-  if (storageLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
-          <h2 className="text-xl font-bold mb-2">設定ページ読み込み中...</h2>
-          <p>株価データを読み込んでいます。</p>
-        </div>
-      </div>
-    );
-  }
+  if (storageLoading) return <StockLoading />;
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
@@ -127,6 +120,7 @@ const SettingPage = () => {
         <p>※毎年8月末に最新のJPX400銘柄リストを更新してください。（<a href="https://www.torezista.com/tool/jpx400/" target='_blank' className='text-blue-500 underline'>ダウンロードリンク</a>）</p>
         <h2 className='mt-6 font-bold text-lg'>更新履歴</h2>
         <ul>
+          <li>2026.03.15 - 読み込み中アニメーションの改修</li>
           <li>2026.03.08 - 会員登録機能＆株価の自動更新機能実装</li>
           <li>2026.03.07 - データベース化に伴うバックアップメール廃止</li>
           <li>2025.12.10 - 検討銘柄新設＆バックアップメール改修</li>

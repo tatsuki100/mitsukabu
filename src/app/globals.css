@@ -19,3 +19,27 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ローソク足ローディングアニメーション Start */
+@keyframes candlestick-grow {
+  0%, 100% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  25%, 65% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  85% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+}
+
+.animate-candlestick-grow {
+  animation: candlestick-grow 3s ease-in-out infinite backwards;
+}
+/* ローソク足ローディングアニメーション End */
