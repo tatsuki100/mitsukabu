@@ -60,11 +60,10 @@ export const metadata: Metadata = {
     images: ["/og-image.jpg"],
   },
   // アプリアイコン設定
-  // icons: {
-  //   icon: "/favicon.ico",
-  //   shortcut: "/favicon-16x16.png",
-  //   apple: "/apple-touch-icon.png",
-  // },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
   // その他のメタデータ
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://www.mitsukabu.com" || "https://mitsukabu.com"),
   alternates: {
