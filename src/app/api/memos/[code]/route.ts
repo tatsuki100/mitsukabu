@@ -4,7 +4,7 @@
 // ========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, toIsoStringUtc } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 // ビルド時の静的生成を防止
@@ -47,14 +47,17 @@ export async function PUT(
     const sql = getDb();
 
     // UPSERT: 存在すれば更新、なければ挿入
-    await sql`
+    const rows = await sql`
       INSERT INTO memos (user_id, stock_code, memo)
       VALUES (${user.userId}, ${stockCode}, ${memo})
       ON CONFLICT (user_id, stock_code)
       DO UPDATE SET memo = ${memo}, updated_at = CURRENT_TIMESTAMP
+      RETURNING updated_at
     `;
 
-    return NextResponse.json({ success: true });
+    const updatedAt = toIsoStringUtc((rows as unknown as { updated_at: string }[])[0].updated_at);
+
+    return NextResponse.json({ success: true, updatedAt });
 
   } catch (error) {
     console.error('PUT /api/memos エラー:', error);

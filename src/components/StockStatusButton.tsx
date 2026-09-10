@@ -17,12 +17,16 @@ const STATUS_ORDER: StockStatus[] = ['none', 'watching', 'considering', 'holding
 interface StockStatusButtonProps {
   stockCode: string;
   onAuthRequired?: () => void;
+  // 制御用（親コンポーネントが同じuseStockDataStorage()インスタンスの状態を渡したい場合に使用）
+  // 指定しない場合は従来通り内部のuseStockDataStorage()を使用する
+  status?: StockStatus;
+  onStatusChange?: (stockCode: string, status: StockStatus) => void;
 }
 
-const StockStatusButton = ({ stockCode, onAuthRequired }: StockStatusButtonProps) => {
+const StockStatusButton = ({ stockCode, onAuthRequired, status: controlledStatus, onStatusChange }: StockStatusButtonProps) => {
   const { getStockStatus, setStockStatus } = useStockDataStorage();
 
-  const status = getStockStatus(stockCode);
+  const status = controlledStatus ?? getStockStatus(stockCode);
 
   // ステータスに応じたアイコンを取得
   const getStatusIcon = (currentStatus: StockStatus) => {
@@ -83,7 +87,11 @@ const StockStatusButton = ({ stockCode, onAuthRequired }: StockStatusButtonProps
     const nextIndex = (currentIndex + 1) % STATUS_ORDER.length;
     const nextStatus = STATUS_ORDER[nextIndex];
 
-    setStockStatus(stockCode, nextStatus);
+    if (onStatusChange) {
+      onStatusChange(stockCode, nextStatus);
+    } else {
+      setStockStatus(stockCode, nextStatus);
+    }
   };
 
   return (

@@ -4,7 +4,7 @@
 // ========================================
 
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, toIsoStringUtc } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 // ビルド時の静的生成を防止
@@ -18,6 +18,7 @@ type StockCodeRow = {
 type MemoRow = {
   stock_code: string;
   memo: string;
+  updated_at: string;
 };
 
 // GET /api/user-data
@@ -39,7 +40,7 @@ export async function GET() {
       sql`SELECT stock_code FROM favorites WHERE user_id = ${user.userId} ORDER BY created_at ASC`,
       sql`SELECT stock_code FROM holdings WHERE user_id = ${user.userId} ORDER BY created_at ASC`,
       sql`SELECT stock_code FROM considering WHERE user_id = ${user.userId} ORDER BY created_at ASC`,
-      sql`SELECT stock_code, memo FROM memos WHERE user_id = ${user.userId}`,
+      sql`SELECT stock_code, memo, updated_at FROM memos WHERE user_id = ${user.userId}`,
     ]);
 
     // レスポンス形式に変換
@@ -48,8 +49,10 @@ export async function GET() {
     const considering = (consideringRows as unknown as StockCodeRow[]).map(row => row.stock_code);
 
     const memos: Record<string, string> = {};
+    const memoUpdatedAt: Record<string, string> = {};
     for (const row of memosRows as unknown as MemoRow[]) {
       memos[row.stock_code] = row.memo;
+      memoUpdatedAt[row.stock_code] = toIsoStringUtc(row.updated_at);
     }
 
     return NextResponse.json({
@@ -57,6 +60,7 @@ export async function GET() {
       holdings,
       considering,
       memos,
+      memoUpdatedAt,
     });
 
   } catch (error) {

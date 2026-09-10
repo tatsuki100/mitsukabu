@@ -12,9 +12,15 @@ type StockMemos = {
   [stockCode: string]: string; // 銘柄コード → メモ内容
 };
 
+// メモ更新日時データの型定義
+type StockMemoUpdatedAt = {
+  [stockCode: string]: string; // 銘柄コード → 最終更新日時（ISO文字列）
+};
+
 // Hook戻り値の型定義
 type UseStockMemoReturn = {
   getMemo: (stockCode: string) => string;
+  getMemoUpdatedAt: (stockCode: string) => string | null;
   saveMemo: (stockCode: string, memo: string) => void;
   deleteMemo: (stockCode: string) => void;
   getAllMemos: () => StockMemos;
@@ -29,6 +35,7 @@ const DEBOUNCE_MS = 500;
 
 export const useStockMemo = (): UseStockMemoReturn => {
   const [memos, setMemos] = useState<StockMemos>({});
+  const [memoUpdatedAt, setMemoUpdatedAt] = useState<StockMemoUpdatedAt>({});
   const [loading, setLoading] = useState<boolean>(true);
 
   // デバウンスタイマー管理（銘柄コードごと）
@@ -69,14 +76,17 @@ export const useStockMemo = (): UseStockMemoReturn => {
 
       if (userData && userData.memos) {
         setMemos(userData.memos);
+        setMemoUpdatedAt(userData.memoUpdatedAt || {});
         console.log(`メモ読み込み完了: ${Object.keys(userData.memos).length}件`);
       } else {
         console.log('メモデータなし');
         setMemos({});
+        setMemoUpdatedAt({});
       }
     } catch (error) {
       console.error('メモ読み込みエラー:', error);
       setMemos({});
+      setMemoUpdatedAt({});
     } finally {
       setLoading(false);
     }
@@ -86,6 +96,11 @@ export const useStockMemo = (): UseStockMemoReturn => {
   const getMemo = useCallback((stockCode: string): string => {
     return memos[stockCode] || '';
   }, [memos]);
+
+  // 特定銘柄のメモ最終更新日時を取得
+  const getMemoUpdatedAt = useCallback((stockCode: string): string | null => {
+    return memoUpdatedAt[stockCode] || null;
+  }, [memoUpdatedAt]);
 
   // メモを保存（楽観的更新 + デバウンスAPI呼び出し）
   const saveMemo = useCallback((stockCode: string, memo: string) => {
@@ -97,10 +112,19 @@ export const useStockMemo = (): UseStockMemoReturn => {
         delete newMemos[stockCode];
         return newMemos;
       });
+      setMemoUpdatedAt(prev => {
+        const newMemoUpdatedAt = { ...prev };
+        delete newMemoUpdatedAt[stockCode];
+        return newMemoUpdatedAt;
+      });
     } else {
       setMemos(prev => ({
         ...prev,
         [stockCode]: memo,
+      }));
+      setMemoUpdatedAt(prev => ({
+        ...prev,
+        [stockCode]: new Date().toISOString(),
       }));
     }
 
@@ -132,9 +156,17 @@ export const useStockMemo = (): UseStockMemoReturn => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ memo }),
         })
-          .then(res => {
+          .then(async res => {
             if (!res.ok) throw new Error(`API Error: ${res.status}`);
             invalidateUserDataCache();
+            // サーバー側の実際の更新日時で補正
+            const data = await res.json();
+            if (data.updatedAt) {
+              setMemoUpdatedAt(prev => ({
+                ...prev,
+                [stockCode]: data.updatedAt,
+              }));
+            }
           })
           .catch(err => {
             console.error('メモ保存APIエラー:', err);
@@ -150,6 +182,11 @@ export const useStockMemo = (): UseStockMemoReturn => {
       const newMemos = { ...prev };
       delete newMemos[stockCode];
       return newMemos;
+    });
+    setMemoUpdatedAt(prev => {
+      const newMemoUpdatedAt = { ...prev };
+      delete newMemoUpdatedAt[stockCode];
+      return newMemoUpdatedAt;
     });
 
     // 既存のデバウンスタイマーをクリア
@@ -179,6 +216,7 @@ export const useStockMemo = (): UseStockMemoReturn => {
 
   return {
     getMemo,
+    getMemoUpdatedAt,
     saveMemo,
     deleteMemo,
     getAllMemos,

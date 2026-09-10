@@ -14,3 +14,11 @@ export function getDb() {
   }
   return neon(databaseUrl);
 }
+
+// TIMESTAMP型（タイムゾーンなし）カラムの値をUTCとして解釈しISO文字列に変換
+// NeonのセッションタイムゾーンはUTCのため、CURRENT_TIMESTAMPの実体はUTC時刻だが
+// タイムゾーン情報を持たない文字列で返ってくる（そのままDate化するとブラウザのローカルタイムゾーンとして誤解釈される）
+export function toIsoStringUtc(value: string | Date): string {
+  if (value instanceof Date) return value.toISOString();
+  return new Date(value + '+00:00').toISOString();
+}

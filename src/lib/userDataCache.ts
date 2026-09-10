@@ -10,6 +10,7 @@ export type UserData = {
   holdings: string[];
   considering: string[];
   memos: Record<string, string>;
+  memoUpdatedAt: Record<string, string>;
 };
 
 // モジュールレベルキャッシュ（重複リクエスト防止）

@@ -30,10 +30,10 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   // localStorage管理
-  const { getStoredStock } = useStockDataStorage();
+  const { getStoredStock, getStockStatus, setStockStatus } = useStockDataStorage();
 
   // メモ管理
-  const { getMemo, saveMemo } = useStockMemo();
+  const { getMemo, getMemoUpdatedAt, saveMemo, deleteMemo } = useStockMemo();
 
   // メモのテキスト状態管理
   const [memoText, setMemoText] = useState<string>('');
@@ -120,6 +120,13 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
     saveMemo(stock.code, newText); // リアルタイムで保存
   };
 
+  // 全てクリアボタンのハンドラー（メモ＋お気に入り状態を一括リセット）
+  const handleClearAll = () => {
+    deleteMemo(stock.code);
+    setMemoText('');
+    setStockStatus(stock.code, 'none');
+  };
+
   // 前日比を計算
   const priceDiff = stock.closePrice - stock.previousClosePrice;
   const priceChangePercent = ((priceDiff / stock.previousClosePrice) * 100).toFixed(2);
@@ -158,6 +165,27 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
 
   // メモがあるかどうかを判定（空文字や空白のみの場合は「メモなし」と判定）
   const hasMemo = memoText.trim().length > 0;
+
+  // メモの最終更新日時を「yyyy-mm-dd hh:mm」形式（JST・秒なし）でフォーマット
+  const formatMemoUpdatedAt = (isoString: string): string => {
+    const date = new Date(isoString);
+    return date.toLocaleString('ja-JP', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).replace(/\//g, '-');
+  };
+
+  // メモ欄の状態表示テキスト（メモがなければ案内文、あれば最終更新日時）
+  const memoStatusText = (): string => {
+    if (!hasMemo) return '自動保存されます';
+    const updatedAt = getMemoUpdatedAt(stock.code);
+    return updatedAt ? formatMemoUpdatedAt(updatedAt) : '自動保存されます';
+  };
 
   // 最後に閲覧した銘柄かどうかを判定（同じページ種別の場合のみ）
   const [isLastViewed, setIsLastViewed] = useState(false);
@@ -202,6 +230,8 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
         <StockStatusButton
           stockCode={stock.code}
           onAuthRequired={!user ? () => setShowAuthModal(true) : undefined}
+          status={getStockStatus(stock.code)}
+          onStatusChange={setStockStatus}
         />
       </div>
 
@@ -290,14 +320,27 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
             }}
           />
           {user && (
-            <div className="flex justify-between items-center mt-1 text-xs text-gray-500">
-              <span>
-                {hasMemo ? '📝 メモ保存済み' : '自動保存されます'}
-              </span>
-              <span className={hasMemo ? 'text-blue-600 font-medium' : ''}>
-                {memoText.length}/500
-              </span>
-            </div>
+            <>
+              <div className="flex justify-between items-center mt-1 text-xs text-gray-500">
+                <span>
+                  {memoStatusText()}
+                </span>
+                <span className={hasMemo ? 'text-blue-600 font-medium' : ''}>
+                  {memoText.length}/500
+                </span>
+              </div>
+              <div className="flex justify-end mt-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClearAll();
+                  }}
+                  className="text-xs text-red-600 hover:text-red-800 underline"
+                >
+                  全てクリア
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>
