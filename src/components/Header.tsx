@@ -8,16 +8,47 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChartCandlestick, Menu, X, LogOut } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import { fetchUserData } from '@/lib/userDataCache';
+
+// 観察・検討・保有銘柄の件数
+type StockCounts = {
+  favorites: number;
+  considering: number;
+  holdings: number;
+};
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [counts, setCounts] = useState<StockCounts | null>(null);
   const pathname = usePathname();
   const user = useAuth();
   const isAdmin = user?.role === 'admin';
 
+  // ページ遷移のたびに観察・検討・保有銘柄の件数を取得
+  useEffect(() => {
+    if (!user) {
+      setCounts(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    fetchUserData().then(data => {
+      if (cancelled || !data) return;
+      setCounts({
+        favorites: data.favorites.length,
+        considering: data.considering.length,
+        holdings: data.holdings.length,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, user]);
 
   // 現在のページかどうかを判定（個別ページも含む）
   const isCurrentPage = (href: string): boolean => {
@@ -85,9 +116,15 @@ const Header = () => {
             <Link href="/" className={getNavLinkClass('/')}>JPX400一覧</Link>
             {isAdmin && <Link href="/turn_back/" className={getNavLinkClass('/turn_back/')}>ターンバック</Link>}
             {isAdmin && <Link href="/cross_v/" className={getNavLinkClass('/cross_v/')}>クロスV</Link>}
-            <Link href="/favorites/" className={getNavLinkClass('/favorites/')}>観察銘柄</Link>
-            <Link href="/considering/" className={getNavLinkClass('/considering/')}>検討銘柄</Link>
-            <Link href="/holdings/" className={getNavLinkClass('/holdings/')}>保有銘柄</Link>
+            <Link href="/favorites/" className={getNavLinkClass('/favorites/')}>
+              観察銘柄{counts && `(${counts.favorites})`}
+            </Link>
+            <Link href="/considering/" className={getNavLinkClass('/considering/')}>
+              検討銘柄{counts && `(${counts.considering})`}
+            </Link>
+            <Link href="/holdings/" className={getNavLinkClass('/holdings/')}>
+              保有銘柄{counts && `(${counts.holdings})`}
+            </Link>
             {isAdmin && <Link href="/setting/" className={getNavLinkClass('/setting/')}>管理画面</Link>}
 
             {/* ユーザー情報 + ログアウト */}
@@ -166,21 +203,21 @@ const Header = () => {
               className={getMobileNavLinkClass('/favorites/')}
               onClick={closeMenu}
             >
-              観察銘柄
+              観察銘柄{counts && `(${counts.favorites})`}
             </Link>
             <Link
               href="/considering/"
               className={getMobileNavLinkClass('/considering/')}
               onClick={closeMenu}
             >
-              検討銘柄
+              検討銘柄{counts && `(${counts.considering})`}
             </Link>
             <Link
               href="/holdings/"
               className={getMobileNavLinkClass('/holdings/')}
               onClick={closeMenu}
             >
-              保有銘柄
+              保有銘柄{counts && `(${counts.holdings})`}
             </Link>
             {isAdmin && (
               <Link
