@@ -112,6 +112,11 @@ const CrossVContent = () => {
         step={1}
         value={draftTrendWindow}
         onChange={(e) => setDraftTrendWindow(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            handleApplyTrendWindow();
+          }
+        }}
         className="border rounded-md p-2 w-20 text-sm"
       />
       <button
