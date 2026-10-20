@@ -24,12 +24,14 @@ interface StockDetailPageProps {
   stockCode: string;
   navigationMode: NavigationMode;
   screeningCondition?: string; // 将来のスクリーニング機能用
+  crossVTrendWindow?: number; // クロスV：前提上昇期間（営業日）。cross_vモード時のみ使用
 }
 
 const StockDetailPage = ({
   stockCode,
-  navigationMode
-  // screeningCondition 
+  navigationMode,
+  // screeningCondition
+  crossVTrendWindow
 }: StockDetailPageProps) => {
   const router = useRouter();
   const user = useAuth();
@@ -48,7 +50,7 @@ const StockDetailPage = ({
   } = useStockDataStorage();
 
   // スクリーニング機能
-  const { turnbackStocks, crossVStocks } = useStockScreening();
+  const { turnbackStocks, crossVStocks } = useStockScreening({ crossVTrendWindow });
 
   // 現在の銘柄データを取得
   const currentStockData = getStoredStock(stockCode);

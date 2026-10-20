@@ -15,7 +15,7 @@ const MainContent = ({ children }: { children: React.ReactNode }) => {
   const noPadding = noPaddingPages.includes(pathname);
 
   return (
-    <main className={`flex-1 ${noPadding ? '' : 'pt-10'}`}>
+    <main className={`flex-1 bg-gray-50 ${noPadding ? '' : 'pt-10'}`}>
       {children}
     </main>
   );

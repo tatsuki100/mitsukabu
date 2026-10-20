@@ -22,9 +22,10 @@ type LinkPrefix = 'stock' | 'favorites' | 'holdings' | 'considering' | 'turn_bac
 interface StockCardProps {
   stock: StoredStock;
   linkPrefix?: LinkPrefix;
+  linkQuery?: string; // 詳細ページへのリンクに引き継ぐクエリ文字列（例："trendWindow=30"）
 }
 
-const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
+const StockCard = ({ stock, linkPrefix = 'stock', linkQuery }: StockCardProps) => {
   // 認証状態
   const user = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -42,7 +43,7 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
   const stockDetailData = getStoredStock(stock.code);
 
   // リンクパスを動的生成
-  const linkPath = `/${linkPrefix}/${stock.code}`;
+  const linkPath = linkQuery ? `/${linkPrefix}/${stock.code}?${linkQuery}` : `/${linkPrefix}/${stock.code}`;
 
   // 初回表示時にメモを読み込み
   useEffect(() => {
@@ -248,7 +249,7 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
         {/* ヘッダー End */}
 
         {/* 価格情報 Start */}
-        <div className="space-y-2 mb-4">
+        <div className="space-y-1 mb-2">
           <div className="flex justify-between items-center">
             <span>現在値</span>
             <div className={`text-lg font-bold ${isPriceUp ? 'text-green-600' : 'text-red-600'}`}>
@@ -297,7 +298,7 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
       </Link>
 
       {/* メモ欄 Start */}
-      <div className="mt-4 border-t pt-3">
+      <div className="mt-2">
         <div className="mt-2">
           <textarea
             value={user ? memoText : ''}
@@ -349,7 +350,7 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
       {/* 証券会社リンクボタン Start */}
       <div className="flex justify-center gap-4 my-3">
         {/* SBI証券 */}
-        <div className="flex justify-center mt-4">
+        <div className="flex justify-center">
           <a
             href={`https://site3.sbisec.co.jp/ETGate/?_ControlID=WPLETsiR001Control&_PageID=WPLETsiR001Idtl30&_DataStoreID=DSWPLETsiR001Control&_ActionID=DefaultAID&s_rkbn=2&s_btype=&i_stock_sec=${stock.code}&i_dom_flg=1&i_exchange_code=JPN&i_output_type=2&exchange_code=TKY&stock_sec_code_mul=${stock.code}&ref_from=1&ref_to=20&wstm4130_sort_id=&wstm4130_sort_kbn=&qr_keyword=1&qr_suggest=1&qr_sort=1`}
             target='_blank'
@@ -363,7 +364,7 @@ const StockCard = ({ stock, linkPrefix = 'stock' }: StockCardProps) => {
         </div>
 
         {/* 楽天証券 */}
-        <div className="flex justify-center mt-4">
+        <div className="flex justify-center">
           <a
             href={`https://www.rakuten-sec.co.jp/web/market/search/quote.html?ric=${stock.code}.T`}
             target='_blank'

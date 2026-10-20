@@ -6,6 +6,11 @@
 import { useStockDataStorage } from './useStockDataStorage';
 import { DailyData, StoredStock } from '@/types/stockData';
 
+// Hookのオプション型
+type UseStockScreeningOptions = {
+  crossVTrendWindow?: number; // クロスV：前提上昇期間（営業日）。未指定時は30
+};
+
 // Hookの戻り値型
 type UseStockScreeningReturn = {
   turnbackStocks: StoredStock[];
@@ -16,8 +21,11 @@ type UseStockScreeningReturn = {
   error: string | null;
 };
 
-export const useStockScreening = (): UseStockScreeningReturn => {
+export const useStockScreening = (options?: UseStockScreeningOptions): UseStockScreeningReturn => {
   const { storedData, loading, error } = useStockDataStorage();
+
+  // クロスVの前提上昇期間（営業日）。1以上の整数に防御的にクランプ
+  const crossVTrendWindow = Math.max(1, Math.floor(options?.crossVTrendWindow ?? 30));
 
   // 移動平均線を計算する関数
   const calculateMA = (closeData: number[], period: number): (number | null)[] => {
@@ -84,31 +92,66 @@ export const useStockScreening = (): UseStockScreeningReturn => {
 
   // クロスV条件の判定 ----------------------------------------------------------------------------
   const isCrossV = (dailyData: DailyData[]): boolean => {
-    if (dailyData.length < 76) return false; // 長期移動平均線（75日）計算に必要
+    const TREND_WINDOW = crossVTrendWindow; // 前提上昇期間（営業日）
+    const LONG_MA_PERIOD = 75; // 長期移動平均線の期間
+    const FULL_LONG_MA_INDEX = LONG_MA_PERIOD - 1; // この index 以降でMA75が「75日分フル」になる
+
+    if (dailyData.length < LONG_MA_PERIOD) return false; // 長期移動平均線（75日）計算に必要
 
     // 全期間の終値データを取得
     const closeData = dailyData.map(item => item.close);
-    
+
     // 移動平均線を計算
     const ma5 = calculateMA(closeData, 5);   // 短期移動平均線
     const ma25 = calculateMA(closeData, 25); // 中期移動平均線
-    const ma75 = calculateMA(closeData, 75); // 長期移動平均線
+    const ma75 = calculateMA(closeData, LONG_MA_PERIOD); // 長期移動平均線
 
-    // 最新日のデータを取得
+    // ある日が条件①（短期線が中期線もしくは長期線の下にいる）を満たすかを判定
+    const isBelow = (index: number): boolean | null => {
+      const ma5Value = ma5[index];
+      const ma25Value = ma25[index];
+      const ma75Value = ma75[index];
+
+      if (ma5Value === null || ma25Value === null || ma75Value === null) return null;
+
+      return ma5Value < ma25Value || ma5Value < ma75Value;
+    };
+
     const latestIndex = dailyData.length - 1;
-    const latestMA5 = ma5[latestIndex];
-    const latestMA25 = ma25[latestIndex];
-    const latestMA75 = ma75[latestIndex];
 
-    // 移動平均線が計算できない場合は除外
-    if (latestMA5 === null || latestMA25 === null || latestMA75 === null) return false;
+    // 条件①：直近日において、短期移動平均線が中期移動平均線もしくは長期移動平均線の下にいる
+    const latestBelow = isBelow(latestIndex);
+    if (latestBelow === null || !latestBelow) return false;
 
-    // 条件：短期移動平均線が、中期移動平均線もしくは長期移動平均線の下にいる
-    const belowMA25 = latestMA5 < latestMA25;
-    const belowMA75 = latestMA5 < latestMA75;
+    // 条件①を「初めて」満たした日（＝現在の下抜け状態が始まった日）を特定する
+    // 前日も条件①を満たしている間は遡り、前日が満たしていない（＝クロスした瞬間）日で止まる
+    let streakStartIndex = latestIndex;
+    while (streakStartIndex - 1 >= 0) {
+      const prevBelow = isBelow(streakStartIndex - 1);
+      if (prevBelow === null || !prevBelow) break;
+      streakStartIndex--;
+    }
 
-    // いずれかの条件に該当すればクロスV
-    return belowMA25 || belowMA75;
+    // 条件②：条件①を初めて満たした日からTREND_WINDOW日間、移動平均線の順番が上から短期線・中期線・長期線だったこと
+    const trendWindowStart = streakStartIndex - TREND_WINDOW;
+
+    // トレンド確認期間の最初の日点でMA75が「75日分フル」になっていない場合はデータ不足のため除外
+    if (trendWindowStart < FULL_LONG_MA_INDEX) return false;
+
+    for (let i = trendWindowStart; i <= streakStartIndex - 1; i++) {
+      const trendMA5 = ma5[i];
+      const trendMA25 = ma25[i];
+      const trendMA75 = ma75[i];
+
+      // 移動平均線が計算できない日があれば除外
+      if (trendMA5 === null || trendMA25 === null || trendMA75 === null) return false;
+
+      // 1日でも順序（短期＞中期＞長期）が崩れていれば除外
+      if (!(trendMA5 > trendMA25 && trendMA25 > trendMA75)) return false;
+    }
+
+    // 条件①・条件②の両方を満たした場合のみクロスV
+    return true;
   };
 
 

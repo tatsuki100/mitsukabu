@@ -13,24 +13,56 @@ import StockCard from '@/components/StockCard';
 import Pagination from '@/components/Pagination';
 import SearchBox from '@/components/SearchBox';
 import FloatingPageNav from '@/components/FloatingPageNav';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import { TrendingUp, Search } from 'lucide-react';
 import { StockLoading, StockError, StockNoData } from '@/components/StockStatusMessages';
 
+// トレンド確認期間のデフォルト値（営業日）
+const DEFAULT_TREND_WINDOW = 30;
+
 const CrossVContent = () => {
   const router = useRouter();
-  
+  const searchParams = useSearchParams();
+
   // localStorage管理
-  const { 
-    loading, 
-    error, 
+  const {
+    loading,
+    error,
     isDataAvailable,
     dataAge
   } = useStockDataStorage();
 
+  // URLから適用中のトレンド確認期間を取得（未指定・不正値はデフォルトを使用）
+  const trendWindowParam = searchParams.get('trendWindow');
+  const parsedTrendWindow = trendWindowParam ? parseInt(trendWindowParam, 10) : NaN;
+  const appliedTrendWindow =
+    Number.isInteger(parsedTrendWindow) && parsedTrendWindow >= 1
+      ? parsedTrendWindow
+      : DEFAULT_TREND_WINDOW;
+
+  // 入力欄用のドラフト値（「適用」ボタンを押すまでは計算に反映しない）
+  const [draftTrendWindow, setDraftTrendWindow] = useState<string>(String(appliedTrendWindow));
+
+  // 「適用」ボタン押下時：URLのtrendWindowを更新（ページは1ページ目にリセット）
+  const handleApplyTrendWindow = () => {
+    const value = parseInt(draftTrendWindow, 10);
+    if (!Number.isInteger(value) || value < 1) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === DEFAULT_TREND_WINDOW) {
+      params.delete('trendWindow'); // デフォルト値の場合はURLをきれいに
+    } else {
+      params.set('trendWindow', String(value));
+    }
+    params.delete('page');
+
+    const newUrl = params.toString() ? `/cross_v?${params.toString()}` : '/cross_v';
+    router.replace(newUrl, { scroll: false });
+  };
+
   // スクリーニング機能
-  const { crossVStocks, crossVCount } = useStockScreening();
+  const { crossVStocks, crossVCount } = useStockScreening({ crossVTrendWindow: appliedTrendWindow });
 
   // 検索機能用のstate
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +99,30 @@ const CrossVContent = () => {
     setSearchQuery('');
   };
 
+  // トレンド確認期間の入力UI（検索結果の有無に関わらず共通で表示）
+  const trendWindowControl = (
+    <div className="flex items-center gap-2">
+      <label htmlFor="trend-window-input" className="text-sm text-gray-600 whitespace-nowrap">
+        前提上昇期間（営業日）
+      </label>
+      <input
+        id="trend-window-input"
+        type="number"
+        min={1}
+        step={1}
+        value={draftTrendWindow}
+        onChange={(e) => setDraftTrendWindow(e.target.value)}
+        className="border rounded-md p-2 w-20 text-sm"
+      />
+      <button
+        onClick={handleApplyTrendWindow}
+        className="bg-blue-500 hover:bg-blue-700 text-white text-sm py-2 px-4 rounded"
+      >
+        適用
+      </button>
+    </div>
+  );
+
   // ローディング中
   if (loading) return <StockLoading />;
 
@@ -87,6 +143,11 @@ const CrossVContent = () => {
           </h2>
         </div>
         
+        {/* トレンド確認期間設定 */}
+        <div className="mb-6">
+          {trendWindowControl}
+        </div>
+
         <div className="bg-gray-100 border border-gray-300 text-gray-700 px-6 py-8 rounded-lg text-center">
           <TrendingUp className="w-12 h-12 mx-auto mb-4 text-gray-400" />
           <h3 className="text-xl font-bold mb-2">クロスV銘柄がありません</h3>
@@ -109,14 +170,14 @@ const CrossVContent = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* ヘッダー */}
-      <div className="mb-6">
+      <div className="mb-4">
         <h2 className="text-2xl font-bold flex items-center">
           <TrendingUp className="w-6 h-6 mr-2 text-red-500" />
           クロスV銘柄
         </h2>
         <div className="flex justify-between items-center mt-2">
           <div className="text-sm text-gray-500">
-            <p className='mb-3'>最終更新：{dataAge}</p>
+            <p className='mb-1'>最終更新：{dataAge}</p>
             <p>
               {isSearchActive ? (
                 <>
@@ -128,24 +189,27 @@ const CrossVContent = () => {
               )}
             </p>
           </div>
-          <div className="space-x-2">
+          {/* <div className="space-x-2">
             <button
               onClick={() => window.location.reload()}
               className="bg-blue-500 hover:bg-blue-700 text-white text-sm py-1 px-3 rounded"
             >
               画面更新
             </button>
-          </div>
+          </div> */}
         </div>
       </div>
 
-      {/* 検索ボックス */}
-      <div className="mb-6">
-        <SearchBox
-          value={searchQuery}
-          onChange={setSearchQuery}
-          onClear={handleClearSearch}
-        />
+      {/* 検索ボックス・トレンド確認期間設定 */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex-1">
+          <SearchBox
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onClear={handleClearSearch}
+          />
+        </div>
+        {trendWindowControl}
       </div>
 
       {/* 検索結果がない場合の表示 */}
@@ -180,7 +244,12 @@ const CrossVContent = () => {
           {/* 銘柄カード一覧 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {displayStocks.map((stock) => (
-              <StockCard key={stock.code} stock={stock} linkPrefix="cross_v" />
+              <StockCard
+                key={stock.code}
+                stock={stock}
+                linkPrefix="cross_v"
+                linkQuery={`trendWindow=${appliedTrendWindow}`}
+              />
             ))}
           </div>
 

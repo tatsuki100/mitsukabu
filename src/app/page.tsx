@@ -9,7 +9,7 @@ import { StockLoading } from "@/components/StockStatusMessages";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen">
       <Suspense fallback={<StockLoading />}>
         <StockList />
       </Suspense>

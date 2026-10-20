@@ -76,7 +76,7 @@ const StockList = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* ヘッダー Start */}
-      <div className="mb-6">
+      <div className="mb-4">
         <h2 className="text-2xl font-bold">JPX400 銘柄一覧</h2>
         <div className="md:flex justify-between items-center mt-2">
           <div className="text-sm text-gray-500 mb-4 md:mb-0">
@@ -92,14 +92,14 @@ const StockList = () => {
               )}
             </p>
           </div>
-          <div className="space-x-2">
+          {/* <div className="space-x-2">
             <button
               onClick={() => window.location.reload()}
               className="bg-blue-500 hover:bg-blue-700 text-white text-sm py-1 px-3 rounded"
             >
               画面更新
             </button>
-          </div>
+          </div> */}
         </div>
       </div>
       {/* ヘッダー End */}
