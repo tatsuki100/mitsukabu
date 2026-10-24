@@ -11,7 +11,7 @@ import StockDetailPage from '@/components/StockDetailPage';
 import { StockLoading } from '@/components/StockStatusMessages';
 
 // トレンド確認期間のデフォルト値（営業日）
-const DEFAULT_TREND_WINDOW = 30;
+const DEFAULT_TREND_WINDOW = 15;
 
 const CrossVStockDetailContent = () => {
   // ルーティング用

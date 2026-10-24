@@ -19,7 +19,7 @@ import { TrendingUp, Search } from 'lucide-react';
 import { StockLoading, StockError, StockNoData } from '@/components/StockStatusMessages';
 
 // トレンド確認期間のデフォルト値（営業日）
-const DEFAULT_TREND_WINDOW = 30;
+const DEFAULT_TREND_WINDOW = 15;
 
 const CrossVContent = () => {
   const router = useRouter();

@@ -8,7 +8,7 @@ import { DailyData, StoredStock } from '@/types/stockData';
 
 // Hookのオプション型
 type UseStockScreeningOptions = {
-  crossVTrendWindow?: number; // クロスV：前提上昇期間（営業日）。未指定時は30
+  crossVTrendWindow?: number; // クロスV：前提上昇期間（営業日）。未指定時は15
 };
 
 // Hookの戻り値型
