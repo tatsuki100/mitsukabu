@@ -25,7 +25,7 @@ export const useStockScreening = (options?: UseStockScreeningOptions): UseStockS
   const { storedData, loading, error } = useStockDataStorage();
 
   // クロスVの前提上昇期間（営業日）。1以上の整数に防御的にクランプ
-  const crossVTrendWindow = Math.max(1, Math.floor(options?.crossVTrendWindow ?? 30));
+  const crossVTrendWindow = Math.max(1, Math.floor(options?.crossVTrendWindow ?? 15));
 
   // 移動平均線を計算する関数
   const calculateMA = (closeData: number[], period: number): (number | null)[] => {
